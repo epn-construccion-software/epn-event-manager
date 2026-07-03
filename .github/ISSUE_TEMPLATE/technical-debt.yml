@@ -1,0 +1,98 @@
+name: Technical Debt
+description: Refactorización, mejora interna o reducción de deuda técnica
+title: "[TECH-DEBT] "
+labels:
+  - "type:technical-debt"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa esta plantilla para registrar refactorizaciones,
+        code smells, duplicación o mejoras de mantenibilidad.
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Situación actual
+      description: Describe cómo está implementado actualmente.
+      placeholder: Explica qué parte del código necesita mejora.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: application
+    attributes:
+      label: Aplicación relacionada
+      options:
+        - cleaning-crud
+        - epn-event-manager
+        - Ambas aplicaciones
+        - Configuración general del repositorio
+    validations:
+      required: true
+
+  - type: textarea
+    id: smell
+    attributes:
+      label: Code smell o deuda identificada
+      description: Indica el problema técnico encontrado.
+      value: |
+        - Clase o método afectado:
+        - Problema identificado:
+        - Riesgo o impacto:
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Refactorización propuesta
+      description: Explica cómo se mejorará la estructura.
+      placeholder: Describe la solución técnica propuesta.
+    validations:
+      required: true
+
+  - type: textarea
+    id: current_behavior
+    attributes:
+      label: Comportamiento que debe conservarse
+      description: Indica qué comportamiento funcional no debe cambiar.
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Estrategia de pruebas
+      value: |
+        - [ ] Crear pruebas de caracterización.
+        - [ ] Confirmar que las pruebas pasan antes del refactor.
+        - [ ] Ejecutar pruebas después de cada cambio.
+        - [ ] Confirmar que la cobertura no disminuye.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ] El comportamiento existente se mantiene.
+        - [ ] Se reduce la duplicación o complejidad.
+        - [ ] Los métodos y clases tienen responsabilidades claras.
+        - [ ] Las pruebas automáticas pasan.
+        - [ ] La cobertura es igual o superior al 80 %.
+        - [ ] No se introducen nuevos code smells críticos.
+        - [ ] La documentación fue actualizada.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencia esperada
+      value: |
+        - Pull Request
+        - Pruebas antes y después
+        - Reporte de cobertura
+        - Resultado de SonarCloud

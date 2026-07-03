@@ -1,0 +1,96 @@
+name: Bug
+description: Reporte de un error o comportamiento inesperado
+title: "[BUG] "
+labels:
+  - "type:bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar el problema.
+        Completa la información necesaria para poder reproducirlo y corregirlo.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Descripción del problema
+      description: Explica qué está fallando.
+      placeholder: Describe el comportamiento observado.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: application
+    attributes:
+      label: Aplicación afectada
+      options:
+        - cleaning-crud
+        - epn-event-manager
+        - Ambas aplicaciones
+        - Configuración general del repositorio
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Pasos para reproducir
+      description: Indica los pasos exactos para observar el error.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Resultado esperado
+      description: Explica qué debería ocurrir.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Resultado actual
+      description: Explica qué ocurre realmente.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencia del error
+      description: Incluye mensajes, logs, capturas o respuestas HTTP.
+      placeholder: Agrega la evidencia disponible.
+
+  - type: textarea
+    id: tdd
+    attributes:
+      label: Estrategia TDD
+      value: |
+        Red:
+        - Prueba que debe fallar antes de la corrección.
+
+        Green:
+        - Cambio mínimo para corregir el problema.
+
+        Refactor:
+        - Mejora interna posterior sin cambiar el comportamiento.
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ] El error puede reproducirse mediante una prueba.
+        - [ ] La prueba falla antes de la corrección.
+        - [ ] La prueba pasa después de la corrección.
+        - [ ] No se introducen regresiones.
+        - [ ] La cobertura no disminuye.
+    validations:
+      required: true
