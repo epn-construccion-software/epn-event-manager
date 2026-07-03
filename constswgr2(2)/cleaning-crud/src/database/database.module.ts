@@ -23,5 +23,3 @@ const logging = process.env.DB_LOGGING === 'true' || false;
   exports: [TypeOrmModule],
 })
 export class DatabaseModule {}
-
-

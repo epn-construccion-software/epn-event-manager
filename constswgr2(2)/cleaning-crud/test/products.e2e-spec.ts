@@ -7,6 +7,7 @@ import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
 import { HttpExceptionFilter } from '../src/filters/http-exception.filter';
 import * as fs from 'fs';
+import { Request, Response, NextFunction } from 'express';
 
 describe('Products API (e2e)', () => {
   let app: INestApplication;
@@ -22,12 +23,16 @@ describe('Products API (e2e)', () => {
 
     // Replicate same setup as main.ts
     app.useGlobalPipes(
-      new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true, transform: true }),
+      new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
     );
     app.useGlobalFilters(new HttpExceptionFilter());
 
     // API key middleware
-    app.use((req: any, res: any, next: any) => {
+    app.use((req: Request, res: Response, next: NextFunction) => {
       const isPublic =
         req.path === '/health' ||
         req.path.startsWith('/health') ||
@@ -63,7 +68,7 @@ describe('Products API (e2e)', () => {
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect((res) => {
+      .expect(res => {
         expect(res.body.status).toBe('OK');
       });
   });
@@ -72,7 +77,7 @@ describe('Products API (e2e)', () => {
     return request(app.getHttpServer())
       .get('/products')
       .expect(401)
-      .expect((res) => {
+      .expect(res => {
         expect(res.body.statusCode).toBe(401);
       });
   });
@@ -102,7 +107,7 @@ describe('Products API (e2e)', () => {
         name: 'Limpiador Test',
         category: 'Desinfectantes',
         quantity: 10,
-        price: 2.50,
+        price: 2.5,
         description: 'Producto de prueba e2e',
       })
       .expect(201);
@@ -118,7 +123,7 @@ describe('Products API (e2e)', () => {
       .get('/products')
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect((res) => {
+      .expect(res => {
         expect(Array.isArray(res.body)).toBe(true);
         expect(res.body.length).toBe(1);
       });
@@ -129,7 +134,7 @@ describe('Products API (e2e)', () => {
       .get(`/products/${createdId}`)
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect((res) => {
+      .expect(res => {
         expect(res.body.id).toBe(createdId);
         expect(res.body.name).toBe('Limpiador Test');
       });
@@ -141,7 +146,7 @@ describe('Products API (e2e)', () => {
       .set('X-FIS-EPN-KEY', API_KEY)
       .send({ price: 3.99, quantity: 20 })
       .expect(200)
-      .expect((res) => {
+      .expect(res => {
         expect(parseFloat(res.body.price)).toBe(3.99);
         expect(res.body.quantity).toBe(20);
       });
@@ -222,7 +227,12 @@ describe('Products API (e2e)', () => {
     return request(app.getHttpServer())
       .post('/products')
       .set('X-FIS-EPN-KEY', API_KEY)
-      .send({ name: '<script>alert(1)</script>', category: 'Cat', quantity: 1, price: 1 })
+      .send({
+        name: '<script>alert(1)</script>',
+        category: 'Cat',
+        quantity: 1,
+        price: 1,
+      })
       .expect(400);
   });
 
@@ -241,13 +251,18 @@ describe('Products API (e2e)', () => {
     await request(app.getHttpServer())
       .post('/products')
       .set('X-FIS-EPN-KEY', API_KEY)
-      .send({ name: 'Producto Stats', category: 'Limpieza', quantity: 5, price: 10 });
+      .send({
+        name: 'Producto Stats',
+        category: 'Limpieza',
+        quantity: 5,
+        price: 10,
+      });
 
     return request(app.getHttpServer())
       .get('/products/stats')
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect((res) => {
+      .expect(res => {
         expect(res.body.totalProducts).toBeDefined();
         expect(res.body.totalQuantity).toBeDefined();
         expect(res.body.totalInventoryValue).toBeDefined();
