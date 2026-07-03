@@ -1,0 +1,87 @@
+name: Task
+description: Documentación, investigación, configuración o mantenimiento
+title: "[TASK] "
+labels:
+  - "type:task"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Usa esta plantilla para registrar tareas de documentación,
+        configuración, investigación o mantenimiento del proyecto.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción
+      description: Explica claramente la tarea que debe realizarse.
+      placeholder: Describe qué se necesita completar.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: application
+    attributes:
+      label: Área relacionada
+      options:
+        - cleaning-crud
+        - epn-event-manager
+        - Ambas aplicaciones
+        - Gestión y documentación
+        - Integración continua
+        - Configuración general del repositorio
+    validations:
+      required: true
+
+  - type: textarea
+    id: activities
+    attributes:
+      label: Actividades
+      value: |
+        - [ ] Actividad 1
+        - [ ] Actividad 2
+        - [ ] Actividad 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      value: |
+        - [ ] El resultado solicitado fue completado.
+        - [ ] La documentación o configuración fue validada.
+        - [ ] El cambio fue revisado.
+        - [ ] La evidencia fue adjuntada.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tdd
+    attributes:
+      label: Aplicación de TDD
+      options:
+        - Required
+        - Applied
+        - Not applicable
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencias
+      description: Indica si la tarea depende de otro Issue o configuración.
+      placeholder: Escribe "Ninguna" si no existen dependencias.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencia esperada
+      value: |
+        - Pull Request
+        - Archivo o configuración creada
+        - Captura del resultado
+        - Enlace al pipeline o documentación

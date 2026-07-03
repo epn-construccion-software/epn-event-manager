@@ -1,0 +1,85 @@
+name: Feature
+description: Solicitud para una nueva funcionalidad
+title: "[FEATURE] "
+labels:
+  - "type:feature"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por proponer una nueva funcionalidad.
+        Completa la información solicitada para que el ticket pueda evaluarse.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Descripción
+      description: Explica claramente la funcionalidad que se desea implementar.
+      placeholder: Describe qué se necesita y en qué parte del sistema.
+    validations:
+      required: true
+
+  - type: textarea
+    id: value
+    attributes:
+      label: Valor aportado
+      description: Explica qué problema resuelve o qué mejora aporta.
+      placeholder: Describe el beneficio para el usuario o para el sistema.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: application
+    attributes:
+      label: Aplicación relacionada
+      options:
+        - cleaning-crud
+        - epn-event-manager
+        - Ambas aplicaciones
+        - Configuración general del repositorio
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Criterios de aceptación
+      description: Escribe condiciones verificables para considerar terminada la funcionalidad.
+      value: |
+        - [ ] Criterio 1
+        - [ ] Criterio 2
+        - [ ] Criterio 3
+    validations:
+      required: true
+
+  - type: textarea
+    id: tests
+    attributes:
+      label: Pruebas requeridas
+      value: |
+        - [ ] Pruebas unitarias
+        - [ ] Pruebas de integración
+        - [ ] Pruebas e2e
+        - [ ] No aplica
+    validations:
+      required: true
+
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencias
+      description: Indica si esta funcionalidad depende de otro ticket, servicio o configuración.
+      placeholder: Escribe "Ninguna" si no existen dependencias.
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidencia esperada
+      description: Indica qué evidencia debe presentarse.
+      value: |
+        - Pull Request
+        - Pruebas automatizadas
+        - Reporte de cobertura
+        - Captura o demostración funcional
