@@ -28,7 +28,9 @@ export class ProductsController {
   async create(@Body() createProductDto: CreateProductDto) {
     try {
       if (!createProductDto.name || !createProductDto.category) {
-        throw new BadRequestException('Los campos name y category son requeridos');
+        throw new BadRequestException(
+          'Los campos name y category son requeridos',
+        );
       }
       const result = await this.productsService.create(createProductDto);
       this.logger.info('Controlador: producto creado', {
@@ -45,7 +47,12 @@ export class ProductsController {
       });
       if (error instanceof HttpException) throw error;
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en create', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en create',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }
@@ -68,7 +75,12 @@ export class ProductsController {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en findAll', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en findAll',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }
@@ -90,7 +102,12 @@ export class ProductsController {
         error: error instanceof Error ? error.message : String(error),
       });
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en getStats', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en getStats',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }
@@ -118,7 +135,12 @@ export class ProductsController {
       });
       if (error instanceof HttpException) throw error;
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en findOne', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en findOne',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }
@@ -134,7 +156,10 @@ export class ProductsController {
       if (isNaN(parsedId)) {
         throw new BadRequestException('El ID debe ser un número válido');
       }
-      const result = await this.productsService.update(parsedId, updateProductDto);
+      const result = await this.productsService.update(
+        parsedId,
+        updateProductDto,
+      );
       this.logger.info('Controlador: producto actualizado', {
         route: `/products/${parsedId}`,
         action: 'UPDATE',
@@ -149,7 +174,12 @@ export class ProductsController {
       });
       if (error instanceof HttpException) throw error;
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en update', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en update',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }
@@ -177,7 +207,12 @@ export class ProductsController {
       });
       if (error instanceof HttpException) throw error;
       throw new HttpException(
-        { statusCode: 500, error: 'Internal Server Error', message: 'Error interno en remove', timestamp: new Date().toISOString() },
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en remove',
+          timestamp: new Date().toISOString(),
+        },
         500,
       );
     }

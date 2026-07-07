@@ -1,4 +1,10 @@
-import { IsOptional, IsString, MaxLength, IsNumber, Min } from 'class-validator';
+import {
+  IsOptional,
+  IsString,
+  MaxLength,
+  IsNumber,
+  Min,
+} from 'class-validator';
 
 export class UpdateProductDto {
   @IsOptional()
@@ -26,4 +32,3 @@ export class UpdateProductDto {
   @MaxLength(300)
   description?: string | undefined;
 }
-

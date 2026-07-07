@@ -28,4 +28,3 @@ export class Product {
     this.deleted = false;
   }
 }
-
