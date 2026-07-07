@@ -1,4 +1,11 @@
-import { IsNotEmpty, IsString, MaxLength, IsNumber, Min, IsOptional } from 'class-validator';
+import {
+  IsNotEmpty,
+  IsString,
+  MaxLength,
+  IsNumber,
+  Min,
+  IsOptional,
+} from 'class-validator';
 
 export class CreateProductDto {
   // [PREVENTIVE] allow optional id to assert duplicates in tests; normally auto-generated
@@ -27,6 +34,5 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   @MaxLength(300)
-  description!: string;
+  description?: string;
 }
-

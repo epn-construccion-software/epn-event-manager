@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, BadRequestException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Product } from './product.model';
@@ -33,6 +38,30 @@ export class ProductsService {
     return process.env.LOGICAL_DELETE === 'true';
   }
 
+  private async emitEventSafely(
+    action: string,
+    entity: string,
+    title: string,
+    description: string,
+    payload: Record<string, unknown>,
+  ): Promise<void> {
+    try {
+      await this.eventEmitter.emitEvent(
+        action,
+        entity,
+        title,
+        description,
+        payload,
+      );
+    } catch (error) {
+      this.logger.warn('Error emitiendo evento externo', {
+        action,
+        entity,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   // [PREVENTIVE] Shared suspicious content pattern
   private readonly suspiciousPattern =
     /<script|<\/script>|SELECT|DROP|INSERT|DELETE|UPDATE|--/i;
@@ -54,28 +83,46 @@ export class ProductsService {
 
     // [PREVENTIVE] Length and injection checks
     if (createProductDto.name.length > 100) {
-      throw new BadRequestException('El nombre no puede superar los 100 caracteres');
+      throw new BadRequestException(
+        'El nombre no puede superar los 100 caracteres',
+      );
     }
     if (createProductDto.category.length > 50) {
-      throw new BadRequestException('La categoría no puede superar los 50 caracteres');
+      throw new BadRequestException(
+        'La categoría no puede superar los 50 caracteres',
+      );
     }
-    if (createProductDto.description && createProductDto.description.length > 300) {
-      throw new BadRequestException('La descripción no puede superar los 300 caracteres');
+    if (
+      createProductDto.description &&
+      createProductDto.description.length > 300
+    ) {
+      throw new BadRequestException(
+        'La descripción no puede superar los 300 caracteres',
+      );
     }
     if (
       this.suspiciousPattern.test(createProductDto.name) ||
       this.suspiciousPattern.test(createProductDto.category) ||
       this.suspiciousPattern.test(createProductDto.description || '')
     ) {
-      throw new BadRequestException('El producto contiene texto no permitido por seguridad');
+      throw new BadRequestException(
+        'El producto contiene texto no permitido por seguridad',
+      );
     }
 
     try {
       // [PREVENTIVE] Duplicate id check if client provides id
-      if (createProductDto['id'] !== undefined && createProductDto['id'] !== null) {
-        const existing = await this.productsRepository.findOne({ where: { id: createProductDto['id'] } });
+      if (
+        createProductDto['id'] !== undefined &&
+        createProductDto['id'] !== null
+      ) {
+        const existing = await this.productsRepository.findOne({
+          where: { id: createProductDto['id'] },
+        });
         if (existing) {
-          throw new BadRequestException(`Producto con ID ${createProductDto['id']} ya existe`);
+          throw new BadRequestException(
+            `Producto con ID ${createProductDto['id']} ya existe`,
+          );
         }
       }
 
@@ -98,7 +145,7 @@ export class ProductsService {
         name: product.name,
       });
 
-      await this.eventEmitter.emitEvent(
+      await this.emitEventSafely(
         'CREATE',
         'product',
         `Producto de limpieza creado: ${product.name}`,
@@ -140,7 +187,7 @@ export class ProductsService {
         count: models.length,
       });
 
-      this.eventEmitter.emitEvent(
+      void this.emitEventSafely(
         'QUERY',
         'product',
         'Listado de productos consultado',
@@ -148,7 +195,8 @@ export class ProductsService {
         {
           count: models.length,
           totalValue: models.reduce(
-            (acc: number, p: any) => acc + parseFloat(p.price.toString()) * p.quantity,
+            (acc: number, p: Product) =>
+              acc + parseFloat(p.price.toString()) * p.quantity,
             0,
           ),
           metadata: this.getAdaptiveMetadata(),
@@ -162,7 +210,9 @@ export class ProductsService {
         action: 'QUERY',
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new InternalServerErrorException('Error interno consultando productos');
+      throw new InternalServerErrorException(
+        'Error interno consultando productos',
+      );
     }
   }
 
@@ -171,7 +221,9 @@ export class ProductsService {
       const product = await this.productsRepository.findOne({ where: { id } });
 
       if (!product || (this.isLogicalDeleteEnabled() && product.deleted)) {
-        throw new NotFoundException(`Producto con ID ${id} no encontrado en la base de datos`);
+        throw new NotFoundException(
+          `Producto con ID ${id} no encontrado en la base de datos`,
+        );
       }
 
       const model = this.entityToModel(product);
@@ -181,7 +233,7 @@ export class ProductsService {
         productId: model.id,
       });
 
-      this.eventEmitter.emitEvent(
+      void this.emitEventSafely(
         'QUERY',
         'product',
         `Producto consultado: ${product.name}`,
@@ -202,35 +254,54 @@ export class ProductsService {
         error: error instanceof Error ? error.message : String(error),
       });
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException('Error interno consultando producto');
+      throw new InternalServerErrorException(
+        'Error interno consultando producto',
+      );
     }
   }
 
-  async update(id: number, updateProductDto: UpdateProductDto): Promise<Product> {
+  async update(
+    id: number,
+    updateProductDto: UpdateProductDto,
+  ): Promise<Product> {
     try {
       const product = await this.productsRepository.findOne({ where: { id } });
 
       if (!product) {
-        throw new NotFoundException(`Producto con ID ${id} no encontrado. No se puede actualizar.`);
+        throw new NotFoundException(
+          `Producto con ID ${id} no encontrado. No se puede actualizar.`,
+        );
       }
 
       // [PREVENTIVE] Validate all fields consistently in update (same rules as create)
       if (updateProductDto.name !== undefined) {
         if (updateProductDto.name.trim() === '')
-          throw new BadRequestException('El nombre del producto es obligatorio');
+          throw new BadRequestException(
+            'El nombre del producto es obligatorio',
+          );
         if (updateProductDto.name.length > 100)
-          throw new BadRequestException('El nombre no puede superar los 100 caracteres');
+          throw new BadRequestException(
+            'El nombre no puede superar los 100 caracteres',
+          );
         if (this.suspiciousPattern.test(updateProductDto.name))
-          throw new BadRequestException('Campo nombre contiene texto no permitido');
+          throw new BadRequestException(
+            'Campo nombre contiene texto no permitido',
+          );
       }
 
       if (updateProductDto.category !== undefined) {
         if (updateProductDto.category.trim() === '')
-          throw new BadRequestException('La categoría del producto es obligatoria');
+          throw new BadRequestException(
+            'La categoría del producto es obligatoria',
+          );
         if (updateProductDto.category.length > 50)
-          throw new BadRequestException('La categoría no puede superar los 50 caracteres');
+          throw new BadRequestException(
+            'La categoría no puede superar los 50 caracteres',
+          );
         if (this.suspiciousPattern.test(updateProductDto.category))
-          throw new BadRequestException('Campo categoría contiene texto no permitido');
+          throw new BadRequestException(
+            'Campo categoría contiene texto no permitido',
+          );
       }
 
       if (updateProductDto.quantity !== undefined) {
@@ -246,9 +317,13 @@ export class ProductsService {
       // [PREVENTIVE] Now also validates description in update (was missing before)
       if (updateProductDto.description !== undefined) {
         if (updateProductDto.description.length > 300)
-          throw new BadRequestException('La descripción no puede superar los 300 caracteres');
+          throw new BadRequestException(
+            'La descripción no puede superar los 300 caracteres',
+          );
         if (this.suspiciousPattern.test(updateProductDto.description))
-          throw new BadRequestException('Campo descripción contiene texto no permitido');
+          throw new BadRequestException(
+            'Campo descripción contiene texto no permitido',
+          );
       }
 
       const previousValues = {
@@ -280,7 +355,7 @@ export class ProductsService {
         productId: model.id,
       });
 
-      await this.eventEmitter.emitEvent(
+      await this.emitEventSafely(
         'UPDATE',
         'product',
         `Producto actualizado: ${product.name}`,
@@ -301,8 +376,14 @@ export class ProductsService {
         action: 'UPDATE',
         error: error instanceof Error ? error.message : String(error),
       });
-      if (error instanceof NotFoundException || error instanceof BadRequestException) throw error;
-      throw new InternalServerErrorException('Error interno actualizando producto');
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      )
+        throw error;
+      throw new InternalServerErrorException(
+        'Error interno actualizando producto',
+      );
     }
   }
 
@@ -311,7 +392,9 @@ export class ProductsService {
       const product = await this.productsRepository.findOne({ where: { id } });
 
       if (!product) {
-        throw new NotFoundException(`Producto con ID ${id} no encontrado. No se puede eliminar.`);
+        throw new NotFoundException(
+          `Producto con ID ${id} no encontrado. No se puede eliminar.`,
+        );
       }
 
       const model = this.entityToModel(product);
@@ -332,7 +415,7 @@ export class ProductsService {
         });
       }
 
-      await this.eventEmitter.emitEvent(
+      await this.emitEventSafely(
         'DELETE',
         'product',
         `Producto eliminado: ${product.name}`,
@@ -355,7 +438,9 @@ export class ProductsService {
         error: error instanceof Error ? error.message : String(error),
       });
       if (error instanceof NotFoundException) throw error;
-      throw new InternalServerErrorException('Error interno eliminando producto');
+      throw new InternalServerErrorException(
+        'Error interno eliminando producto',
+      );
     }
   }
 
@@ -371,12 +456,12 @@ export class ProductsService {
       const totalProducts = products.length;
 
       const totalQuantity = products.reduce(
-        (acc: number, product: any) => acc + product.quantity,
+        (acc: number, product: ProductEntity) => acc + product.quantity,
         0,
       );
 
       const totalInventoryValue = products.reduce(
-        (acc: number, product: any) =>
+        (acc: number, product: ProductEntity) =>
           acc + parseFloat(product.price.toString()) * product.quantity,
         0,
       );
@@ -385,7 +470,7 @@ export class ProductsService {
         totalQuantity > 0 ? totalInventoryValue / totalQuantity : 0;
 
       const productsByCategory = products.reduce(
-        (acc: Record<string, number>, product: any) => {
+        (acc: Record<string, number>, product: ProductEntity) => {
           acc[product.category] = (acc[product.category] || 0) + 1;
           return acc;
         },
@@ -415,7 +500,9 @@ export class ProductsService {
         action: 'QUERY',
         error: error instanceof Error ? error.message : String(error),
       });
-      throw new InternalServerErrorException('Error interno generando estadísticas');
+      throw new InternalServerErrorException(
+        'Error interno generando estadísticas',
+      );
     }
   }
 

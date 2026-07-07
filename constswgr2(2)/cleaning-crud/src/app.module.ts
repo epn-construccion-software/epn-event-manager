@@ -12,4 +12,3 @@ import { EventEmitterService } from './services/event-emitter.service';
   providers: [AppService, LoggerService, EventEmitterService],
 })
 export class AppModule {}
-
