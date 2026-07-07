@@ -134,12 +134,14 @@ export class EventsService {
     const createCount = await this.createRepo.count();
     const updateCount = await this.updateRepo.count();
     const deleteCount = await this.deleteRepo.count();
-    // Incidencia perfectiva: query_events no se incluye en el total
+    const queryCount = await this.queryRepo.count();
+
     return {
       create: createCount,
       update: updateCount,
       delete: deleteCount,
-      total: createCount + updateCount + deleteCount,
+      query: queryCount,
+      total: createCount + updateCount + deleteCount + queryCount,
     };
   }
 }
