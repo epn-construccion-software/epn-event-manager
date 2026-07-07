@@ -5,5 +5,5 @@ export class CreateEventDto {
   title: string;
   description: string;
 
-  payload: any;
+  payload: Record<string, unknown>;
 }
