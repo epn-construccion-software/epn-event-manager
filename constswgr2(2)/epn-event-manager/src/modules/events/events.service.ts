@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -82,7 +82,7 @@ export class EventsService {
       return { ok: true };
     }
 
-    return { ok: false };
+    throw new BadRequestException('Acción no válida');
   }
 
   async findAll(): Promise<object[]> {
