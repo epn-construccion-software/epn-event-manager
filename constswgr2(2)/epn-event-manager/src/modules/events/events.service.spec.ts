@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { Repository } from 'typeorm';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -145,10 +146,17 @@ describe('EventsService', () => {
     expect(queryRepo.save).toHaveBeenCalledTimes(1);
   });
 
-  it('should not save unsupported actions', async () => {
-    const result = await service.registerEvent(createDto('ARCHIVE'));
+  it('should reject unsupported actions with BadRequestException', async () => {
+    await expect(service.registerEvent(createDto('ARCHIVE'))).rejects.toThrow(
+      BadRequestException,
+    );
 
-    expect(result).toEqual({ ok: false });
+    await expect(
+      service.registerEvent(createDto('ARCHIVE')),
+    ).rejects.toMatchObject({
+      status: 400,
+    });
+
     expect(createRepo.save).not.toHaveBeenCalled();
     expect(updateRepo.save).not.toHaveBeenCalled();
     expect(deleteRepo.save).not.toHaveBeenCalled();

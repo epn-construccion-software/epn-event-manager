@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
@@ -40,6 +41,22 @@ describe('EventsController', () => {
 
     await expect(controller.registerEvent(dto)).resolves.toEqual({ ok: true });
     expect(eventsService.registerEvent).toHaveBeenCalledWith(dto);
+  });
+
+  it('registerEvent propagates BadRequestException for unsupported actions', async () => {
+    const invalidDto: CreateEventDto = {
+      ...dto,
+      action: 'INVALID',
+      payload: {},
+    };
+    eventsService.registerEvent.mockRejectedValue(
+      new BadRequestException('Acción no válida'),
+    );
+
+    await expect(controller.registerEvent(invalidDto)).rejects.toThrow(
+      BadRequestException,
+    );
+    expect(eventsService.registerEvent).toHaveBeenCalledWith(invalidDto);
   });
 
   it('findAll delegates to EventsService.findAll and returns events', async () => {
