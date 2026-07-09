@@ -1,0 +1,86 @@
+name: Monorepo CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  cleaning-crud:
+    name: Validate cleaning-crud
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: "constswgr2(2)/cleaning-crud"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: "constswgr2(2)/cleaning-crud/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests with coverage
+        run: npm run test:cov -- --runInBand
+
+  epn-event-manager:
+    name: Validate epn-event-manager
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: "constswgr2(2)/epn-event-manager"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: "constswgr2(2)/epn-event-manager/package-lock.json"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npm run typecheck
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests with coverage
+        run: npm run test:cov -- --runInBand
