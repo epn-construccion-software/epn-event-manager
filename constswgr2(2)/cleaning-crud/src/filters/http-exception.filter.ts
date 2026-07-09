@@ -11,9 +11,9 @@ import { Request, Response } from 'express';
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost): void {
-    const context = host.switchToHttp();
-    const response = context.getResponse<Response>();
-    const request = context.getRequest<Request>();
+    const ctx = host.switchToHttp();
+    const response = ctx.getResponse<Response>();
+    const request = ctx.getRequest<Request>();
 
     const status =
       exception instanceof HttpException
@@ -21,23 +21,16 @@ export class HttpExceptionFilter implements ExceptionFilter {
         : HttpStatus.INTERNAL_SERVER_ERROR;
 
     let message = 'Error interno del servidor';
-
     if (exception instanceof HttpException) {
-      const exceptionResponse = exception.getResponse();
-
-      if (typeof exceptionResponse === 'string') {
-        message = exceptionResponse;
-      } else if (
-        typeof exceptionResponse === 'object' &&
-        exceptionResponse !== null
-      ) {
-        const errorResponse = exceptionResponse as Record<string, unknown>;
-        const responseMessage = errorResponse['message'];
-
-        if (Array.isArray(responseMessage)) {
-          message = responseMessage.map(String).join(', ');
-        } else if (responseMessage !== undefined) {
-          message = String(responseMessage);
+      const res = exception.getResponse();
+      if (typeof res === 'string') {
+        message = res;
+      } else if (typeof res === 'object' && res !== null) {
+        const r = res as Record<string, unknown>;
+        if (r['message']) {
+          message = Array.isArray(r['message'])
+            ? r['message'].join(', ')
+            : String(r['message']);
         }
       }
     }

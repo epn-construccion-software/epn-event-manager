@@ -1,7 +1,7 @@
 // NOTE: env vars must be set before module imports because DatabaseModule reads them at evaluation time.
 // They are set via test/jest.setup.ts configured in jest-e2e.json setupFiles.
 
-import * as request from 'supertest';
+import request, { Response as SupertestResponse } from 'supertest';
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { AppModule } from '../src/app.module';
@@ -13,6 +13,7 @@ describe('Products API (e2e)', () => {
   let app: INestApplication;
   const API_KEY = 'test-api-key-e2e';
   let createdId: number;
+  let initialProductCount = 0;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -68,7 +69,7 @@ describe('Products API (e2e)', () => {
     return request(app.getHttpServer())
       .get('/health')
       .expect(200)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(res.body.status).toBe('OK');
       });
   });
@@ -77,8 +78,9 @@ describe('Products API (e2e)', () => {
     return request(app.getHttpServer())
       .get('/products')
       .expect(401)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(res.body.statusCode).toBe(401);
+        expect(res.body.message).toBe('Missing or invalid API key');
       });
   });
 
@@ -91,12 +93,15 @@ describe('Products API (e2e)', () => {
 
   // ── CRUD completo ─────────────────────────────────────────────────────────
 
-  it('GET /products debe retornar arreglo vacío al inicio', () => {
+  it('GET /products debe retornar productos iniciales', () => {
     return request(app.getHttpServer())
       .get('/products')
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect([]);
+      .expect((res: SupertestResponse) => {
+        expect(Array.isArray(res.body)).toBe(true);
+        initialProductCount = res.body.length;
+      });
   });
 
   it('POST /products debe crear un producto y retornar 201', async () => {
@@ -118,14 +123,14 @@ describe('Products API (e2e)', () => {
     createdId = res.body.id;
   });
 
-  it('GET /products debe retornar 1 producto después de crear', () => {
+  it('GET /products debe retornar un producto adicional después de crear', () => {
     return request(app.getHttpServer())
       .get('/products')
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(Array.isArray(res.body)).toBe(true);
-        expect(res.body.length).toBe(1);
+        expect(res.body.length).toBe(initialProductCount + 1);
       });
   });
 
@@ -134,7 +139,7 @@ describe('Products API (e2e)', () => {
       .get(`/products/${createdId}`)
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(res.body.id).toBe(createdId);
         expect(res.body.name).toBe('Limpiador Test');
       });
@@ -146,7 +151,7 @@ describe('Products API (e2e)', () => {
       .set('X-FIS-EPN-KEY', API_KEY)
       .send({ price: 3.99, quantity: 20 })
       .expect(200)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(parseFloat(res.body.price)).toBe(3.99);
         expect(res.body.quantity).toBe(20);
       });
@@ -207,6 +212,20 @@ describe('Products API (e2e)', () => {
       .expect(400);
   });
 
+  it('POST /products con campo no permitido debe responder 400', () => {
+    return request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Test',
+        category: 'Cat',
+        quantity: 1,
+        price: 1,
+        extra: 'no permitido',
+      })
+      .expect(400);
+  });
+
   it('POST /products con precio negativo debe responder 400', () => {
     return request(app.getHttpServer())
       .post('/products')
@@ -262,7 +281,7 @@ describe('Products API (e2e)', () => {
       .get('/products/stats')
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
-      .expect(res => {
+      .expect((res: SupertestResponse) => {
         expect(res.body.totalProducts).toBeDefined();
         expect(res.body.totalQuantity).toBeDefined();
         expect(res.body.totalInventoryValue).toBeDefined();

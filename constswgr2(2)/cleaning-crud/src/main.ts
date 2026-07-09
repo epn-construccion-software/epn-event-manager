@@ -1,27 +1,26 @@
-import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-import { NestExpressApplication } from '@nestjs/platform-express';
-import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import * as dotenv from 'dotenv';
-import { NextFunction, Request, Response } from 'express';
-import * as path from 'path';
-
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './filters/http-exception.filter';
+import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import { ValidationPipe } from '@nestjs/common';
 import { LoggerService } from './services/logger.service';
+import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { HttpExceptionFilter } from './filters/http-exception.filter';
+import { Request, Response, NextFunction } from 'express';
 
-dotenv.config();
+dotenv.config(); // [ADAPTIVE] load environment variables from .env
 
-async function bootstrap(): Promise<void> {
+async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Habilitar CORS
   app.enableCors();
 
-  // Servir archivos estáticos
+  // Servir archivos estáticos (HTML, CSS, JS)
   app.useStaticAssets(path.join(__dirname, '..', 'public'));
 
-  // Validación global
+  // [PREVENTIVE] Global validation pipe - strict mode: reject unknown fields
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -30,82 +29,65 @@ async function bootstrap(): Promise<void> {
     }),
   );
 
-  // Filtro global de excepciones
+  // [PREVENTIVE] Global exception filter for uniform error responses
   app.useGlobalFilters(new HttpExceptionFilter());
 
-  // Middleware de autenticación mediante API Key
-  app.use((request: Request, response: Response, next: NextFunction) => {
-    const isPublicRoute =
-      request.path === '/health' ||
-      request.path.startsWith('/health') ||
-      request.path === '/' ||
-      request.path.startsWith('/index') ||
-      /\.(js|css|ico|png|jpg|jpeg|svg|woff|woff2|ttf)$/.test(request.path);
+  // [ADAPTIVE] API Key middleware — strict: reject all protected requests when key is not configured
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    const isPublic =
+      req.path === '/health' ||
+      req.path.startsWith('/health') ||
+      req.path === '/' ||
+      req.path.startsWith('/index') ||
+      req.path.match(/\.(js|css|ico|png|jpg|svg|woff|woff2|ttf)$/);
 
-    if (isPublicRoute) {
-      next();
-      return;
-    }
+    if (isPublic) return next();
 
-    const requiredApiKey = process.env.FIS_EPN_KEY;
-    const providedApiKey =
-      request.header('X-FIS-EPN-KEY') ?? request.headers['x-fis-epn-key'];
+    const required = process.env.FIS_EPN_KEY;
+    const key = req.header
+      ? req.header('X-FIS-EPN-KEY') || req.headers['x-fis-epn-key']
+      : req.headers['x-fis-epn-key'];
 
-    const isValidApiKey =
-      requiredApiKey !== undefined &&
-      typeof providedApiKey === 'string' &&
-      providedApiKey === requiredApiKey;
-
-    if (!isValidApiKey) {
-      response.status(401).json({
+    // [SECURITY] Reject if key not configured OR key missing/invalid
+    if (!required || !key || key !== required) {
+      res.status(401).json({
         statusCode: 401,
         error: 'Unauthorized',
         message: 'Missing or invalid API key',
         timestamp: new Date().toISOString(),
-        path: request.url,
       });
-
       return;
     }
-
     next();
   });
 
-  // Configuración de Swagger
+  // [PERFECTIVO] Swagger UI available at /api/docs
   const swaggerConfig = new DocumentBuilder()
     .setTitle('Cleaning CRUD API')
     .setDescription(
-      'API REST para la gestión de inventario de productos de limpieza',
+      'API REST para gestión de inventario de productos de limpieza',
     )
     .setVersion('1.0')
     .addApiKey(
-      {
-        type: 'apiKey',
-        in: 'header',
-        name: 'X-FIS-EPN-KEY',
-      },
+      { type: 'apiKey', in: 'header', name: 'X-FIS-EPN-KEY' },
       'apiKey',
     )
     .build();
-
-  const swaggerDocument = SwaggerModule.createDocument(app, swaggerConfig);
-
-  SwaggerModule.setup('api/docs', app, swaggerDocument);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
+  SwaggerModule.setup('api/docs', app, document);
 
   const logger = new LoggerService();
-  const port = Number.parseInt(process.env.PORT ?? '3001', 10);
-
-  await app.listen(port);
-
-  logger.info('Cleaning CRUD iniciado', {
-    route: `http://localhost:${port}`,
-    action: 'STARTUP',
-  });
-
-  logger.info('Swagger UI disponible', {
-    route: `http://localhost:${port}/api/docs`,
-    action: 'STARTUP',
+  const port = parseInt(process.env.PORT || '3001', 10);
+  await app.listen(port, () => {
+    logger.info('Cleaning CRUD iniciado', {
+      route: `http://localhost:${port}`,
+      action: 'STARTUP',
+    });
+    logger.info('Swagger UI disponible', {
+      route: `http://localhost:${port}/api/docs`,
+      action: 'STARTUP',
+    });
   });
 }
 
-void bootstrap();
+bootstrap();

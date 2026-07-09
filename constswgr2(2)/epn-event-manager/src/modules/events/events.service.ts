@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreateEventDto } from './dto/create-event.dto';
@@ -9,6 +9,8 @@ import { QueryEventEntity } from '../../database/entities/query-event.entity';
 
 @Injectable()
 export class EventsService {
+  private readonly logger = new Logger(EventsService.name);
+
   constructor(
     @InjectRepository(CreateEventEntity)
     private readonly createRepo: Repository<CreateEventEntity>,
@@ -26,6 +28,18 @@ export class EventsService {
     // Fecha guardada en formato local, no UTC (debilidad intencional)
     const localDate = new Date().toLocaleString();
 
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'registerEvent',
+        action,
+        source: dto.source,
+        entity: dto.entity,
+        status: 'attempt',
+        message: 'Attempting to register event',
+      }),
+    );
+
     if (action === 'CREATE') {
       const ev = this.createRepo.create({
         source: dto.source,
@@ -37,6 +51,17 @@ export class EventsService {
         recorded_at: localDate,
       });
       await this.createRepo.save(ev);
+      this.logger.log(
+        JSON.stringify({
+          context: EventsService.name,
+          operation: 'registerEvent',
+          action,
+          source: dto.source,
+          entity: dto.entity,
+          status: 'success',
+          message: 'Event saved successfully',
+        }),
+      );
       return { ok: true };
     }
 
@@ -51,6 +76,17 @@ export class EventsService {
         timestamp: localDate,
       });
       await this.updateRepo.save(ev);
+      this.logger.log(
+        JSON.stringify({
+          context: EventsService.name,
+          operation: 'registerEvent',
+          action,
+          source: dto.source,
+          entity: dto.entity,
+          status: 'success',
+          message: 'Event saved successfully',
+        }),
+      );
       return { ok: true };
     }
 
@@ -65,6 +101,17 @@ export class EventsService {
         createdAt: localDate,
       });
       await this.deleteRepo.save(ev);
+      this.logger.log(
+        JSON.stringify({
+          context: EventsService.name,
+          operation: 'registerEvent',
+          action,
+          source: dto.source,
+          entity: dto.entity,
+          status: 'success',
+          message: 'Event saved successfully',
+        }),
+      );
       return { ok: true };
     }
 
@@ -79,13 +126,43 @@ export class EventsService {
         event_date: localDate,
       });
       await this.queryRepo.save(ev);
+      this.logger.log(
+        JSON.stringify({
+          context: EventsService.name,
+          operation: 'registerEvent',
+          action,
+          source: dto.source,
+          entity: dto.entity,
+          status: 'success',
+          message: 'Event saved successfully',
+        }),
+      );
       return { ok: true };
     }
 
+    this.logger.warn(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'registerEvent',
+        action,
+        source: dto.source,
+        entity: dto.entity,
+        status: 'unsupported_action',
+        message: 'Unsupported event action received',
+      }),
+    );
     return { ok: false };
   }
 
   async findAll(): Promise<object[]> {
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'findAll',
+        status: 'query',
+        message: 'Retrieving all events',
+      }),
+    );
     // Incidencia perfectiva: agrega 4 tablas en memoria sin orden garantizado
     const creates = await this.createRepo.find();
     const updates = await this.updateRepo.find();
@@ -114,6 +191,15 @@ export class EventsService {
   }
 
   async findBySource(source: string): Promise<object[]> {
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'findBySource',
+        source,
+        status: 'query',
+        message: 'Retrieving events by source',
+      }),
+    );
     const creates = await this.createRepo.findBy({ source });
     const updates = await this.updateRepo.findBy({ source });
     const deletes = await this.deleteRepo.findBy({ source });
@@ -122,6 +208,15 @@ export class EventsService {
   }
 
   async findByEntity(entity: string): Promise<object[]> {
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'findByEntity',
+        entity,
+        status: 'query',
+        message: 'Retrieving events by entity',
+      }),
+    );
     // Incidencia preventiva: parametro entity usado directamente sin sanitizar
     const creates = await this.createRepo.findBy({ entity });
     const updates = await this.updateRepo.findBy({ entity });
@@ -131,15 +226,25 @@ export class EventsService {
   }
 
   async getStats(): Promise<object> {
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'getStats',
+        status: 'query',
+        message: 'Retrieving event statistics',
+      }),
+    );
     const createCount = await this.createRepo.count();
     const updateCount = await this.updateRepo.count();
     const deleteCount = await this.deleteRepo.count();
-    // Incidencia perfectiva: query_events no se incluye en el total
+    const queryCount = await this.queryRepo.count();
+
     return {
       create: createCount,
       update: updateCount,
       delete: deleteCount,
-      total: createCount + updateCount + deleteCount,
+      query: queryCount,
+      total: createCount + updateCount + deleteCount + queryCount,
     };
   }
 }
