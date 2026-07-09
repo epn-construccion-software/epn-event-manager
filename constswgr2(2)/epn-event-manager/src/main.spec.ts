@@ -5,6 +5,10 @@ type NestApplicationMock = {
   >;
 };
 
+type BootstrapLoggerMock = {
+  log: jest.MockedFunction<(message: string) => void>;
+};
+
 const importMain = async (port?: string) => {
   jest.resetModules();
 
@@ -24,13 +28,25 @@ const importMain = async (port?: string) => {
   const create = jest.fn<Promise<NestApplicationMock>, [unknown]>(() =>
     Promise.resolve(app),
   );
-  const logSpy = jest.spyOn(console, 'log').mockImplementation(() => undefined);
+  const logger: BootstrapLoggerMock = {
+    log: jest.fn(),
+  };
+  const LoggerMock = jest.fn<BootstrapLoggerMock, [string]>(() => logger);
 
   jest.doMock('@nestjs/core', () => ({
     NestFactory: {
       create,
     },
   }));
+  jest.doMock('@nestjs/common', () => {
+    const actual =
+      jest.requireActual<typeof import('@nestjs/common')>('@nestjs/common');
+
+    return {
+      ...actual,
+      Logger: LoggerMock,
+    };
+  });
 
   jest.isolateModules(() => {
     void jest.requireActual('./main');
@@ -38,7 +54,7 @@ const importMain = async (port?: string) => {
   await Promise.resolve();
   await Promise.resolve();
 
-  return { app, create, logSpy };
+  return { app, create, logger };
 };
 
 describe('main bootstrap', () => {
@@ -46,26 +62,27 @@ describe('main bootstrap', () => {
     delete process.env.PORT;
     jest.restoreAllMocks();
     jest.dontMock('@nestjs/core');
+    jest.dontMock('@nestjs/common');
   });
 
   it('creates the app, enables CORS and listens on the default port', async () => {
-    const { app, create, logSpy } = await importMain();
+    const { app, create, logger } = await importMain();
 
     expect(create).toHaveBeenCalledTimes(1);
     expect(app.enableCors).toHaveBeenCalledTimes(1);
     expect(app.listen.mock.calls[0][0]).toBe(3002);
     expect(typeof app.listen.mock.calls[0][1]).toBe('function');
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(logger.log).toHaveBeenCalledWith(
       expect.stringContaining('http://localhost:3002'),
     );
   });
 
   it('uses PORT from the environment when provided', async () => {
-    const { app, logSpy } = await importMain('4100');
+    const { app, logger } = await importMain('4100');
 
     expect(app.listen.mock.calls[0][0]).toBe('4100');
     expect(typeof app.listen.mock.calls[0][1]).toBe('function');
-    expect(logSpy).toHaveBeenCalledWith(
+    expect(logger.log).toHaveBeenCalledWith(
       expect.stringContaining('http://localhost:4100'),
     );
   });
