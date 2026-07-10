@@ -98,3 +98,42 @@ jobs:
       - name: Run tests with coverage
         working-directory: "constswgr2(2)/epn-event-manager"
         run: npm run test:cov -- --runInBand
+
+  sonarcloud:
+    name: SonarCloud analysis
+    runs-on: ubuntu-latest
+    needs:
+      - cleaning-crud
+      - epn-event-manager
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install cleaning-crud dependencies
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm ci
+
+      - name: Generate cleaning-crud coverage
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run test:cov -- --runInBand
+
+      - name: Install epn-event-manager dependencies
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm ci
+
+      - name: Generate epn-event-manager coverage
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run test:cov -- --runInBand
+
+      - name: Run SonarCloud analysis
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
