@@ -12,4 +12,3 @@ import { ProductEntity } from './product.entity';
   providers: [ProductsService, EventEmitterService, LoggerService],
 })
 export class ProductsModule {}
-

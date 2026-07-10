@@ -5,7 +5,7 @@ import { DatabaseInitializerService } from './database-initializer.service';
 
 // [ADAPTIVE] read DB configuration from environment variables
 const dbPath = process.env.DB_PATH || 'database.sqlite';
-const synchronize = process.env.DB_SYNCHRONIZE === 'true' || true;
+const synchronize = process.env.DB_SYNCHRONIZE !== 'false';
 const logging = process.env.DB_LOGGING === 'true' || false;
 
 @Module({
@@ -23,5 +23,3 @@ const logging = process.env.DB_LOGGING === 'true' || false;
   exports: [TypeOrmModule],
 })
 export class DatabaseModule {}
-
-

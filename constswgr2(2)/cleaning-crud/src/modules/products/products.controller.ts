@@ -32,14 +32,29 @@ export class ProductsController {
           'Los campos name y category son requeridos',
         );
       }
-
       const result = await this.productsService.create(createProductDto);
-      this.logger.info('Controller: create', { id: result.id });
+      this.logger.info('Controlador: producto creado', {
+        route: '/products',
+        action: 'CREATE',
+        productId: result.id,
+      });
       return result;
     } catch (error) {
-      this.logger.error('Controller: create error', { error: error instanceof Error ? error.message : String(error) });
+      this.logger.error('Controlador: error en create', {
+        route: '/products',
+        action: 'CREATE',
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof HttpException) throw error;
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en create', timestamp: new Date().toISOString() }, 500);
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en create',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 
@@ -47,21 +62,54 @@ export class ProductsController {
   async findAll() {
     try {
       const result = await this.productsService.findAll();
-      this.logger.info('Controller: findAll', { count: result.length });
+      this.logger.info('Controlador: productos listados', {
+        route: '/products',
+        action: 'QUERY',
+        count: result.length,
+      });
       return result;
     } catch (error) {
-      this.logger.error('Controller: findAll error', { error: error instanceof Error ? error.message : String(error) });
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en findAll', timestamp: new Date().toISOString() }, 500);
+      this.logger.error('Controlador: error en findAll', {
+        route: '/products',
+        action: 'QUERY',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en findAll',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 
   @Get('stats')
   async getStats() {
     try {
-      return await this.productsService.getStats();
+      const result = await this.productsService.getStats();
+      this.logger.info('Controlador: estadísticas generadas', {
+        route: '/products/stats',
+        action: 'QUERY',
+      });
+      return result;
     } catch (error) {
-      this.logger.error('Controller: getStats error', { error: error instanceof Error ? error.message : String(error) });
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en getStats', timestamp: new Date().toISOString() }, 500);
+      this.logger.error('Controlador: error en getStats', {
+        route: '/products/stats',
+        action: 'QUERY',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en getStats',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 
@@ -73,12 +121,28 @@ export class ProductsController {
         throw new BadRequestException('El ID debe ser un número válido');
       }
       const result = await this.productsService.findOne(parsedId);
-      this.logger.info('Controller: findOne', { id: parsedId });
+      this.logger.info('Controlador: producto consultado', {
+        route: `/products/${parsedId}`,
+        action: 'QUERY',
+        productId: parsedId,
+      });
       return result;
     } catch (error) {
-      this.logger.error('Controller: findOne error', { error: error instanceof Error ? error.message : String(error) });
+      this.logger.error('Controlador: error en findOne', {
+        route: `/products/${id}`,
+        action: 'QUERY',
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof HttpException) throw error;
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en findOne', timestamp: new Date().toISOString() }, 500);
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en findOne',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 
@@ -92,13 +156,32 @@ export class ProductsController {
       if (isNaN(parsedId)) {
         throw new BadRequestException('El ID debe ser un número válido');
       }
-      const result = await this.productsService.update(parsedId, updateProductDto);
-      this.logger.info('Controller: update', { id: parsedId });
+      const result = await this.productsService.update(
+        parsedId,
+        updateProductDto,
+      );
+      this.logger.info('Controlador: producto actualizado', {
+        route: `/products/${parsedId}`,
+        action: 'UPDATE',
+        productId: parsedId,
+      });
       return result;
     } catch (error) {
-      this.logger.error('Controller: update error', { error: error instanceof Error ? error.message : String(error) });
+      this.logger.error('Controlador: error en update', {
+        route: `/products/${id}`,
+        action: 'UPDATE',
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof HttpException) throw error;
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en update', timestamp: new Date().toISOString() }, 500);
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en update',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 
@@ -110,13 +193,28 @@ export class ProductsController {
         throw new BadRequestException('El ID debe ser un número válido');
       }
       const result = await this.productsService.remove(parsedId);
-      this.logger.info('Controller: remove', { id: parsedId });
+      this.logger.info('Controlador: producto eliminado', {
+        route: `/products/${parsedId}`,
+        action: 'DELETE',
+        productId: parsedId,
+      });
       return result;
     } catch (error) {
-      this.logger.error('Controller: remove error', { error: error instanceof Error ? error.message : String(error) });
+      this.logger.error('Controlador: error en remove', {
+        route: `/products/${id}`,
+        action: 'DELETE',
+        error: error instanceof Error ? error.message : String(error),
+      });
       if (error instanceof HttpException) throw error;
-      throw new HttpException({ statusCode: 500, error: 'Internal Server Error', message: 'Error interno en remove', timestamp: new Date().toISOString() }, 500);
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en remove',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
     }
   }
 }
-

@@ -30,7 +30,7 @@ export class DatabaseInitializerService implements OnModuleInit {
           name: 'Detergente para Pisos',
           category: 'detergentes',
           quantity: 30,
-          price: 3.50,
+          price: 3.5,
           description: 'Detergente concentrado para pisos',
         },
         {
@@ -52,4 +52,3 @@ export class DatabaseInitializerService implements OnModuleInit {
     }
   }
 }
-
