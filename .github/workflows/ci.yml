@@ -1,0 +1,100 @@
+name: Monorepo CI
+
+on:
+  pull_request:
+    branches:
+      - develop
+      - main
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  cleaning-crud:
+    name: Validate cleaning-crud
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify lockfile
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: |
+          pwd
+          ls -la
+          test -f package-lock.json
+
+      - name: Install dependencies
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm ci
+
+      - name: Check formatting
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run format:check
+
+      - name: Run lint
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run lint
+
+      - name: Run typecheck
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run typecheck
+
+      - name: Build project
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run build
+
+      - name: Run tests with coverage
+        working-directory: "constswgr2(2)/cleaning-crud"
+        run: npm run test:cov -- --runInBand
+
+  epn-event-manager:
+    name: Validate epn-event-manager
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify lockfile
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: |
+          pwd
+          ls -la
+          test -f package-lock.json
+
+      - name: Install dependencies
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm ci
+
+      - name: Check formatting
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run format:check
+
+      - name: Run lint
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run lint
+
+      - name: Run typecheck
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run typecheck
+
+      - name: Build project
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run build
+
+      - name: Run tests with coverage
+        working-directory: "constswgr2(2)/epn-event-manager"
+        run: npm run test:cov -- --runInBand
