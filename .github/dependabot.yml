@@ -1,0 +1,22 @@
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/constswgr2(2)/cleaning-crud"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "cleaning-crud"
+
+  - package-ecosystem: "npm"
+    directory: "/constswgr2(2)/epn-event-manager"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "epn-event-manager"
