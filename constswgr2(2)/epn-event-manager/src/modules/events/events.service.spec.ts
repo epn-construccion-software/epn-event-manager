@@ -6,6 +6,7 @@ import { CreateEventEntity } from '../../database/entities/create-event.entity';
 import { UpdateEventEntity } from '../../database/entities/update-event.entity';
 import { DeleteEventEntity } from '../../database/entities/delete-event.entity';
 import { QueryEventEntity } from '../../database/entities/query-event.entity';
+import { EventFiltersDto } from './dto/event-filters.dto';
 
 type RepositoryMock<T extends object> = {
   create: jest.Mock<T, [Partial<T>]>;
@@ -221,6 +222,72 @@ describe('EventsService', () => {
       expect.objectContaining({ _table: 'create_events' }),
       expect.objectContaining({ _table: 'update_events' }),
     ]);
+  });
+
+  describe('findAll filters', () => {
+    beforeEach(() => {
+      createRepo.findBy.mockResolvedValue([
+        {
+          action: 'CREATE',
+          source: 'cleaning-crud',
+          entity: 'product',
+          recorded_at: '2026-07-07 10:00:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.findBy.mockResolvedValue([]);
+      deleteRepo.findBy.mockResolvedValue([]);
+      queryRepo.findBy.mockResolvedValue([]);
+    });
+
+    it.each([
+      ['action', { action: 'CREATE' }],
+      ['source', { source: 'cleaning-crud' }],
+      ['entity', { entity: 'product' }],
+    ] as const)('should filter events by %s', async (_name, filters) => {
+      const result = await service.findAll(filters);
+
+      expect(result).toHaveLength(1);
+      expect(createRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(updateRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(deleteRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(queryRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(createRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('should apply combined filters with AND criteria', async () => {
+      const filters: EventFiltersDto = {
+        action: 'CREATE',
+        source: 'cleaning-crud',
+        entity: 'product',
+      };
+
+      const result = await service.findAll(filters);
+
+      expect(result).toHaveLength(1);
+      expect(createRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          action: 'CREATE',
+          source: 'cleaning-crud',
+          entity: 'product',
+          _table: 'create_events',
+        }),
+      );
+    });
+
+    it.each([
+      [{ action: 'ARCHIVE' }, 'action'],
+      [{ source: '' }, 'source'],
+      [{ entity: '   ' }, 'entity'],
+      [{ status: 'active' }, 'status'],
+    ])('should reject invalid filters %o', async (filters, message) => {
+      await expect(
+        service.findAll(filters as unknown as EventFiltersDto),
+      ).rejects.toThrow(message);
+
+      expect(createRepo.find).not.toHaveBeenCalled();
+      expect(createRepo.findBy).not.toHaveBeenCalled();
+    });
   });
 
   it('should find events by source in all repositories', async () => {

@@ -6,6 +6,7 @@ import { CreateEventEntity } from '../../database/entities/create-event.entity';
 import { UpdateEventEntity } from '../../database/entities/update-event.entity';
 import { DeleteEventEntity } from '../../database/entities/delete-event.entity';
 import { QueryEventEntity } from '../../database/entities/query-event.entity';
+import { EventFiltersDto } from './dto/event-filters.dto';
 
 @Injectable()
 export class EventsService {
@@ -154,20 +155,32 @@ export class EventsService {
     throw new BadRequestException('Acción no válida');
   }
 
-  async findAll(): Promise<object[]> {
+  async findAll(filters: EventFiltersDto = {}): Promise<object[]> {
+    const validatedFilters = EventFiltersDto.validate(filters);
+    const hasFilters = Object.keys(validatedFilters).length > 0;
+
     this.logger.log(
       JSON.stringify({
         context: EventsService.name,
         operation: 'findAll',
+        filters: validatedFilters,
         status: 'query',
         message: 'Retrieving all events',
       }),
     );
     // Incidencia perfectiva: agrega 4 tablas en memoria sin orden garantizado
-    const creates = await this.createRepo.find();
-    const updates = await this.updateRepo.find();
-    const deletes = await this.deleteRepo.find();
-    const queries = await this.queryRepo.find();
+    const creates = hasFilters
+      ? await this.createRepo.findBy(validatedFilters)
+      : await this.createRepo.find();
+    const updates = hasFilters
+      ? await this.updateRepo.findBy(validatedFilters)
+      : await this.updateRepo.find();
+    const deletes = hasFilters
+      ? await this.deleteRepo.findBy(validatedFilters)
+      : await this.deleteRepo.find();
+    const queries = hasFilters
+      ? await this.queryRepo.findBy(validatedFilters)
+      : await this.queryRepo.find();
 
     // Ordena lexicograficamente por strings de fecha heterogeneos (incorrecto)
     const merged = [

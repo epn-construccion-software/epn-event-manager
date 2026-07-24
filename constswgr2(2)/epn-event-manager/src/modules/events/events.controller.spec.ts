@@ -2,6 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { CreateEventDto } from './dto/create-event.dto';
 import { EventsController } from './events.controller';
 import { EventsService } from './events.service';
+import { EventFiltersDto } from './dto/event-filters.dto';
 
 type EventsServiceMock = jest.Mocked<
   Pick<
@@ -59,14 +60,27 @@ describe('EventsController', () => {
     expect(eventsService.registerEvent).toHaveBeenCalledWith(invalidDto);
   });
 
-  it('findAll delegates to EventsService.findAll and returns events', async () => {
+  it('findAll without filters delegates to EventsService.findAll', async () => {
     const events: object[] = [
       { source: 'cleaning-crud', entity: 'product', action: 'CREATE' },
     ];
     eventsService.findAll.mockResolvedValue(events);
 
     await expect(controller.findAll()).resolves.toBe(events);
-    expect(eventsService.findAll).toHaveBeenCalledTimes(1);
+    expect(eventsService.findAll).toHaveBeenCalledWith({});
+  });
+
+  it('findAll delegates query filters to EventsService.findAll', async () => {
+    const filters: EventFiltersDto = {
+      action: 'CREATE',
+      source: 'cleaning-crud',
+      entity: 'product',
+    };
+    const events: object[] = [{ ...filters }];
+    eventsService.findAll.mockResolvedValue(events);
+
+    await expect(controller.findAll(filters)).resolves.toBe(events);
+    expect(eventsService.findAll).toHaveBeenCalledWith(filters);
   });
 
   it('findBySource delegates to EventsService.findBySource with the source param', async () => {
