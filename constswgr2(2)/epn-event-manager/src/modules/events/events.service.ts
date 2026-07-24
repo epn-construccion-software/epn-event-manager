@@ -247,10 +247,12 @@ export class EventsService {
         message: 'Retrieving event statistics',
       }),
     );
-    const createCount = await this.createRepo.count();
-    const updateCount = await this.updateRepo.count();
-    const deleteCount = await this.deleteRepo.count();
-    const queryCount = await this.queryRepo.count();
+    // [PREVENTIVE] Normalizar cada conteo evita null/undefined/NaN cuando un
+    // repositorio esta vacio o el driver devuelve un valor no numerico.
+    const createCount = this.normalizeCount(await this.createRepo.count());
+    const updateCount = this.normalizeCount(await this.updateRepo.count());
+    const deleteCount = this.normalizeCount(await this.deleteRepo.count());
+    const queryCount = this.normalizeCount(await this.queryRepo.count());
 
     return {
       create: createCount,
@@ -259,5 +261,12 @@ export class EventsService {
       query: queryCount,
       total: createCount + updateCount + deleteCount + queryCount,
     };
+  }
+
+  // [PREVENTIVE] Asegura un numero finito estable (0 en el peor caso) para
+  // que GET /stats nunca responda null, undefined ni NaN en ningun conteo.
+  private normalizeCount(value: unknown): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
   }
 }

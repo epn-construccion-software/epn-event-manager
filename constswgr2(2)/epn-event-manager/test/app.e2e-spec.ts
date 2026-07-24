@@ -133,4 +133,88 @@ describe('AppController (e2e)', () => {
     const body = response.body as { message: unknown };
     expect(body.message).toEqual(expect.stringMatching(/filtro/i));
   });
+
+  it('/stats (GET) returns numeric counts when repositories have data', async () => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/stats')
+      .expect(200);
+
+    const body = response.body as {
+      create: number;
+      update: number;
+      delete: number;
+      query: number;
+      total: number;
+    };
+    expect(body).toEqual({
+      create: 1,
+      update: 1,
+      delete: 1,
+      query: 1,
+      total: 4,
+    });
+  });
+});
+
+describe('StatsController (e2e) - empty repositories', () => {
+  let app: INestApplication;
+
+  const emptyRepositoryMock = () => ({
+    find: jest.fn().mockResolvedValue([]),
+    findBy: jest.fn().mockResolvedValue([]),
+    count: jest.fn().mockResolvedValue(0),
+    create: jest.fn(),
+    save: jest.fn(),
+  });
+
+  beforeAll(async () => {
+    const moduleBuilder = Test.createTestingModule({
+      imports: [AppModule],
+    });
+
+    moduleBuilder
+      .overrideProvider(getRepositoryToken(CreateEventEntity))
+      .useValue(emptyRepositoryMock());
+    moduleBuilder
+      .overrideProvider(getRepositoryToken(UpdateEventEntity))
+      .useValue(emptyRepositoryMock());
+    moduleBuilder
+      .overrideProvider(getRepositoryToken(DeleteEventEntity))
+      .useValue(emptyRepositoryMock());
+    moduleBuilder
+      .overrideProvider(getRepositoryToken(QueryEventEntity))
+      .useValue(emptyRepositoryMock());
+
+    const moduleFixture: TestingModule = await moduleBuilder.compile();
+
+    app = moduleFixture.createNestApplication();
+    await app.init();
+  });
+
+  afterAll(async () => {
+    await app.close();
+  });
+
+  it('/stats (GET) returns five zero values, all numeric, when every repository is empty', async () => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/stats')
+      .expect(200);
+
+    const body = response.body as Record<string, number>;
+    expect(body).toEqual({
+      create: 0,
+      update: 0,
+      delete: 0,
+      query: 0,
+      total: 0,
+    });
+    Object.values(body).forEach((value) => {
+      expect(typeof value).toBe('number');
+      expect(Number.isNaN(value)).toBe(false);
+    });
+  });
 });
