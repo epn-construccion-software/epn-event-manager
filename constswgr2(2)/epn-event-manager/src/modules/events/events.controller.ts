@@ -47,6 +47,20 @@ export class EventsController {
     return this.eventsService.findAll(filters);
   }
 
+  @Get('latest')
+  findLatest(@Query('limit') limit?: string) {
+    this.logger.log(
+      JSON.stringify({
+        context: EventsController.name,
+        operation: 'findLatest',
+        limit,
+        status: 'received',
+        message: 'Find latest events request received',
+      }),
+    );
+    return this.eventsService.findLatest(limit);
+  }
+
   @Get('source/:source')
   findBySource(@Param('source') source: string) {
     this.logger.log(

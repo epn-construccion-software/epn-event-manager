@@ -336,6 +336,117 @@ describe('EventsService', () => {
     expect(queryRepo.findBy).toHaveBeenCalledWith({ entity: 'product' });
   });
 
+  describe('findLatest', () => {
+    beforeEach(() => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 1,
+          source: 'cleaning-crud',
+          recorded_at: '2026-07-07 10:00:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 2,
+          source: 'cleaning-crud',
+          timestamp: '2026-07-07 12:00:00',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([
+        {
+          id: 3,
+          source: 'cleaning-crud',
+          createdAt: '2026-07-07 09:00:00',
+        } as DeleteEventEntity,
+      ]);
+      queryRepo.find.mockResolvedValue([
+        {
+          id: 4,
+          source: 'cleaning-crud',
+          event_date: '2026-07-07 11:00:00',
+        } as QueryEventEntity,
+      ]);
+    });
+
+    it('returns events ordered from most to least recent', async () => {
+      const result = await service.findLatest();
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 2, _table: 'update_events' }),
+        expect.objectContaining({ id: 4, _table: 'query_events' }),
+        expect.objectContaining({ id: 1, _table: 'create_events' }),
+        expect.objectContaining({ id: 3, _table: 'delete_events' }),
+      ]);
+    });
+
+    it('applies the default limit when none is provided', async () => {
+      const result = await service.findLatest();
+
+      expect(result).toHaveLength(4);
+    });
+
+    it('limits the amount of returned events', async () => {
+      const result = await service.findLatest(2);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual([
+        expect.objectContaining({ id: 2 }),
+        expect.objectContaining({ id: 4 }),
+      ]);
+    });
+
+    it('accepts limit as a numeric string coming from the query string', async () => {
+      const result = await service.findLatest('1');
+
+      expect(result).toEqual([expect.objectContaining({ id: 2 })]);
+    });
+
+    it('returns an empty array when every repository is empty', async () => {
+      createRepo.find.mockResolvedValue([]);
+      updateRepo.find.mockResolvedValue([]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result).toEqual([]);
+    });
+
+    it('treats missing or invalid dates as the oldest possible value', async () => {
+      createRepo.find.mockResolvedValue([
+        { id: 5, source: 'cleaning-crud' } as CreateEventEntity,
+      ]);
+
+      const result = await service.findLatest();
+
+      expect(result[result.length - 1]).toEqual(
+        expect.objectContaining({ id: 5 }),
+      );
+    });
+
+    it.each([
+      ['0', '0'],
+      ['-1', '-1'],
+      ['1.5', '1.5'],
+      ['abc', 'abc'],
+      ['101', '101'],
+    ])('rejects an invalid limit value %s', async (_name, value) => {
+      await expect(service.findLatest(value)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(createRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('rejects a limit that is not a string or number', async () => {
+      await expect(service.findLatest(['1', '2'])).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(createRepo.find).not.toHaveBeenCalled();
+    });
+  });
+
   it('should include QUERY events in stats total', async () => {
     createRepo.count.mockResolvedValue(2);
     updateRepo.count.mockResolvedValue(3);
