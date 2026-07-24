@@ -133,4 +133,75 @@ describe('AppController (e2e)', () => {
     const body = response.body as { message: unknown };
     expect(body.message).toEqual(expect.stringMatching(/filtro/i));
   });
+
+  it('/events/latest (GET) returns events ordered from most to least recent', async () => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/events/latest')
+      .expect(200);
+
+    const body = response.body as Array<{ id: number }>;
+    expect(body.map((event) => event.id)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('/events/latest?limit=N (GET) caps the amount of returned events', async () => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/events/latest?limit=2')
+      .expect(200);
+
+    const body = response.body as Array<{ id: number }>;
+    expect(body).toHaveLength(2);
+    expect(body.map((event) => event.id)).toEqual([4, 3]);
+  });
+
+  it.each([
+    '/events/latest?limit=0',
+    '/events/latest?limit=abc',
+    '/events/latest?limit=101',
+  ])('%s (GET) rejects an invalid limit', async (url) => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get(url)
+      .expect(400);
+
+    const body = response.body as { message: unknown };
+    expect(body.message).toEqual(expect.stringMatching(/limit/i));
+  });
+
+  it('/events/latest (GET) returns 200 and [] when there are no events', async () => {
+    const emptyModuleBuilder = Test.createTestingModule({
+      imports: [AppModule],
+    });
+
+    emptyModuleBuilder
+      .overrideProvider(getRepositoryToken(CreateEventEntity))
+      .useValue(repositoryMock([]));
+    emptyModuleBuilder
+      .overrideProvider(getRepositoryToken(UpdateEventEntity))
+      .useValue(repositoryMock([]));
+    emptyModuleBuilder
+      .overrideProvider(getRepositoryToken(DeleteEventEntity))
+      .useValue(repositoryMock([]));
+    emptyModuleBuilder
+      .overrideProvider(getRepositoryToken(QueryEventEntity))
+      .useValue(repositoryMock([]));
+
+    const emptyModuleFixture = await emptyModuleBuilder.compile();
+    const emptyApp = emptyModuleFixture.createNestApplication();
+    await emptyApp.init();
+
+    const response = await supertest(
+      emptyApp.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/events/latest')
+      .expect(200);
+
+    expect(response.body).toEqual([]);
+
+    await emptyApp.close();
+  });
 });

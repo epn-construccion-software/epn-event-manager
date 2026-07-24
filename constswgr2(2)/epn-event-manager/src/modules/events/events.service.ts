@@ -7,6 +7,7 @@ import { UpdateEventEntity } from '../../database/entities/update-event.entity';
 import { DeleteEventEntity } from '../../database/entities/delete-event.entity';
 import { QueryEventEntity } from '../../database/entities/query-event.entity';
 import { EventFiltersDto } from './dto/event-filters.dto';
+import { LatestEventsQueryDto } from './dto/latest-events-query.dto';
 
 @Injectable()
 export class EventsService {
@@ -236,6 +237,62 @@ export class EventsService {
     const deletes = await this.deleteRepo.findBy({ entity });
     const queries = await this.queryRepo.findBy({ entity });
     return [...creates, ...updates, ...deletes, ...queries];
+  }
+
+  async findLatest(rawLimit?: unknown): Promise<object[]> {
+    const limit = LatestEventsQueryDto.validate(rawLimit);
+
+    this.logger.log(
+      JSON.stringify({
+        context: EventsService.name,
+        operation: 'findLatest',
+        limit,
+        status: 'query',
+        message: 'Retrieving latest events',
+      }),
+    );
+
+    const [creates, updates, deletes, queries] = await Promise.all([
+      this.createRepo.find(),
+      this.updateRepo.find(),
+      this.deleteRepo.find(),
+      this.queryRepo.find(),
+    ]);
+
+    const merged = [
+      ...creates.map((e) => ({ ...e, _table: 'create_events' })),
+      ...updates.map((e) => ({ ...e, _table: 'update_events' })),
+      ...deletes.map((e) => ({ ...e, _table: 'delete_events' })),
+      ...queries.map((e) => ({ ...e, _table: 'query_events' })),
+    ];
+
+    return merged
+      .map((event) => ({
+        event,
+        recordedAt: this.normalizeEventTimestamp(
+          event as unknown as Record<string, unknown>,
+        ),
+      }))
+      .sort((a, b) => b.recordedAt - a.recordedAt)
+      .slice(0, limit)
+      .map(({ event }) => event);
+  }
+
+  // Homogeneiza los distintos nombres/formatos de fecha de las 4 tablas
+  // (recorded_at, timestamp, createdAt, event_date) a un timestamp comparable.
+  private normalizeEventTimestamp(event: Record<string, unknown>): number {
+    const raw =
+      event.recorded_at ??
+      event.timestamp ??
+      event.createdAt ??
+      event.event_date;
+
+    if (typeof raw !== 'string' || raw.trim() === '') {
+      return 0;
+    }
+
+    const parsed = new Date(raw).getTime();
+    return Number.isNaN(parsed) ? 0 : parsed;
   }
 
   async getStats(): Promise<object> {

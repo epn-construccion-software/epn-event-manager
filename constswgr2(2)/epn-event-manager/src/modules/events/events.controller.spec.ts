@@ -7,7 +7,7 @@ import { EventFiltersDto } from './dto/event-filters.dto';
 type EventsServiceMock = jest.Mocked<
   Pick<
     EventsService,
-    'registerEvent' | 'findAll' | 'findBySource' | 'findByEntity'
+    'registerEvent' | 'findAll' | 'findLatest' | 'findBySource' | 'findByEntity'
   >
 >;
 
@@ -28,6 +28,7 @@ describe('EventsController', () => {
     eventsService = {
       registerEvent: jest.fn(),
       findAll: jest.fn(),
+      findLatest: jest.fn(),
       findBySource: jest.fn(),
       findByEntity: jest.fn(),
     };
@@ -81,6 +82,34 @@ describe('EventsController', () => {
 
     await expect(controller.findAll(filters)).resolves.toBe(events);
     expect(eventsService.findAll).toHaveBeenCalledWith(filters);
+  });
+
+  it('findLatest without limit delegates to EventsService.findLatest', async () => {
+    const events: object[] = [{ source: 'cleaning-crud' }];
+    eventsService.findLatest.mockResolvedValue(events);
+
+    await expect(controller.findLatest()).resolves.toBe(events);
+    expect(eventsService.findLatest).toHaveBeenCalledWith(undefined);
+  });
+
+  it('findLatest delegates the limit query param to EventsService.findLatest', async () => {
+    const events: object[] = [{ source: 'cleaning-crud' }];
+    eventsService.findLatest.mockResolvedValue(events);
+
+    await expect(controller.findLatest('5')).resolves.toBe(events);
+    expect(eventsService.findLatest).toHaveBeenCalledWith('5');
+  });
+
+  it('findLatest propagates BadRequestException for invalid limits', async () => {
+    eventsService.findLatest.mockRejectedValue(
+      new BadRequestException(
+        'El parámetro limit debe ser un entero entre 1 y 100',
+      ),
+    );
+
+    await expect(controller.findLatest('0')).rejects.toThrow(
+      BadRequestException,
+    );
   });
 
   it('findBySource delegates to EventsService.findBySource with the source param', async () => {
