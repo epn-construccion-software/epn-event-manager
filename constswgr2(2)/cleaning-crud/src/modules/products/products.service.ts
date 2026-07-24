@@ -32,6 +32,12 @@ type ProductsStats = {
   message: string;
 };
 
+type ActiveProductsSummary = {
+  activeProducts: number;
+  totalQuantity: number;
+  totalInventoryValue: number;
+};
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -286,6 +292,33 @@ export class ProductsService {
     }
   }
 
+  async getActiveSummary(): Promise<ActiveProductsSummary> {
+    try {
+      const allProducts = await this.productsRepository.find();
+
+      // [PREVENTIVE] Exclude logically deleted products, consistent with findAll/getStats
+      const products = this.filterDeletedProducts(allProducts);
+      const summary = this.calculateActiveSummary(products);
+
+      this.logger.info('Resumen de productos activos generado', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+        activeProducts: summary.activeProducts,
+      });
+
+      return summary;
+    } catch (error) {
+      this.logger.error('Error en getActiveSummary', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new InternalServerErrorException(
+        'Error interno generando el resumen de productos activos',
+      );
+    }
+  }
+
   private buildCreateProductEntity(dto: CreateProductDto): ProductEntity {
     return this.productsRepository.create({
       name: dto.name.trim(),
@@ -423,6 +456,29 @@ export class ProductsService {
         timeZone: 'America/Guayaquil',
       }),
       message: 'Reporte estadístico generado correctamente',
+    };
+  }
+
+  private calculateActiveSummary(
+    products: ProductEntity[],
+  ): ActiveProductsSummary {
+    const activeProducts = products.length;
+
+    const totalQuantity = products.reduce(
+      (acc: number, product: ProductEntity) => acc + product.quantity,
+      0,
+    );
+
+    const totalInventoryValue = products.reduce(
+      (acc: number, product: ProductEntity) =>
+        acc + parseFloat(product.price.toString()) * product.quantity,
+      0,
+    );
+
+    return {
+      activeProducts,
+      totalQuantity,
+      totalInventoryValue,
     };
   }
 

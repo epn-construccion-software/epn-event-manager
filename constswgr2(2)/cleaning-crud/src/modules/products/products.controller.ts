@@ -113,6 +113,33 @@ export class ProductsController {
     }
   }
 
+  @Get('active-summary')
+  async getActiveSummary() {
+    try {
+      const result = await this.productsService.getActiveSummary();
+      this.logger.info('Controlador: resumen de productos activos generado', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+      });
+      return result;
+    } catch (error) {
+      this.logger.error('Controlador: error en getActiveSummary', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+        error: error instanceof Error ? error.message : String(error),
+      });
+      throw new HttpException(
+        {
+          statusCode: 500,
+          error: 'Internal Server Error',
+          message: 'Error interno en getActiveSummary',
+          timestamp: new Date().toISOString(),
+        },
+        500,
+      );
+    }
+  }
+
   @Get(':id')
   async findOne(@Param('id') id: string) {
     try {
