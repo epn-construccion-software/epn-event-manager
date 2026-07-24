@@ -8,6 +8,7 @@ import { EventEmitterService } from '../../services/event-emitter.service';
 import { LoggerService } from '../../services/logger.service';
 import { ProductEntity } from './product.entity';
 import { ProductsService } from './products.service';
+import { ProductValidationService } from './product-validation.service';
 
 type MockProductRepository = {
   create: jest.MockedFunction<
@@ -53,6 +54,7 @@ describe('ProductsService', () => {
     >;
   };
   let logger: jest.Mocked<Pick<LoggerService, 'info' | 'error' | 'warn'>>;
+  let productValidation: ProductValidationService;
 
   beforeEach(() => {
     repo = {
@@ -71,8 +73,12 @@ describe('ProductsService', () => {
       >(async () => undefined),
     };
     logger = { info: jest.fn(), error: jest.fn(), warn: jest.fn() };
+    productValidation = new ProductValidationService(
+      repo as unknown as Repository<ProductEntity>,
+    );
     service = new ProductsService(
       repo as unknown as Repository<ProductEntity>,
+      productValidation,
       eventEmitter as unknown as EventEmitterService,
       logger as unknown as LoggerService,
     );
@@ -84,6 +90,11 @@ describe('ProductsService', () => {
   });
 
   it('creates a product, trims values, logs and emits an event', async () => {
+    const validateCreate = jest.spyOn(productValidation, 'validateCreate');
+    const validateDuplicate = jest.spyOn(
+      productValidation,
+      'validateCreateDuplicateId',
+    );
     const product = await service.create({
       name: '  Cloro  ',
       category: '  Desinfectantes  ',
@@ -100,6 +111,8 @@ describe('ProductsService', () => {
       description: 'Botella',
     });
     expect(product.name).toBe('Cloro');
+    expect(validateCreate).toHaveBeenCalledTimes(1);
+    expect(validateDuplicate).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith(
       'Producto creado',
       expect.objectContaining({ action: 'CREATE', productId: 1 }),
@@ -238,6 +251,7 @@ describe('ProductsService', () => {
   });
 
   it('updates a product and records previous values in the event payload', async () => {
+    const validateUpdate = jest.spyOn(productValidation, 'validateUpdate');
     repo.findOne.mockResolvedValue(makeProductEntity({ id: 2, name: 'Viejo' }));
 
     const updated = await service.update(2, {
@@ -249,6 +263,7 @@ describe('ProductsService', () => {
     });
 
     expect(updated.name).toBe('Nuevo');
+    expect(validateUpdate).toHaveBeenCalledTimes(1);
     expect(repo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Nuevo',
