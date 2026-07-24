@@ -1,6 +1,15 @@
-import { Body, Controller, Get, Logger, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Logger,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { EventsService } from './events.service';
 import { CreateEventDto } from './dto/create-event.dto';
+import { EventFiltersDto } from './dto/event-filters.dto';
 
 @Controller('events')
 export class EventsController {
@@ -25,16 +34,17 @@ export class EventsController {
   }
 
   @Get()
-  findAll() {
+  findAll(@Query() filters: EventFiltersDto = {}) {
     this.logger.log(
       JSON.stringify({
         context: EventsController.name,
         operation: 'findAll',
+        filters,
         status: 'received',
         message: 'Find all events request received',
       }),
     );
-    return this.eventsService.findAll();
+    return this.eventsService.findAll(filters);
   }
 
   @Get('source/:source')
