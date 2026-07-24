@@ -212,6 +212,47 @@ describe('Products API (e2e)', () => {
       .expect(400);
   });
 
+  it.each([
+    ['name ausente', { category: 'Cat', quantity: 1, price: 1 }],
+    ['category ausente', { name: 'Test', quantity: 1, price: 1 }],
+    ['name vacío', { name: '', category: 'Cat', quantity: 1, price: 1 }],
+    [
+      'category con espacios',
+      { name: 'Test', category: '   ', quantity: 1, price: 1 },
+    ],
+    ['quantity ausente', { name: 'Test', category: 'Cat', price: 1 }],
+    [
+      'quantity no numérico',
+      { name: 'Test', category: 'Cat', quantity: 'uno', price: 1 },
+    ],
+    ['price ausente', { name: 'Test', category: 'Cat', quantity: 1 }],
+    [
+      'price no numérico',
+      { name: 'Test', category: 'Cat', quantity: 1, price: 'uno' },
+    ],
+  ])(
+    'POST /products con %s debe responder 400 sin persistir',
+    async (_case, payload) => {
+      const beforeResponse = await request(app.getHttpServer())
+        .get('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      const countBefore = (beforeResponse.body as unknown[]).length;
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send(payload)
+        .expect(400);
+
+      const afterResponse = await request(app.getHttpServer())
+        .get('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      expect(afterResponse.body as unknown[]).toHaveLength(countBefore);
+    },
+  );
+
   it('POST /products con campo no permitido debe responder 400', () => {
     return request(app.getHttpServer())
       .post('/products')
@@ -261,6 +302,93 @@ describe('Products API (e2e)', () => {
       .set('X-FIS-EPN-KEY', API_KEY)
       .send({ price: -10 })
       .expect(400);
+  });
+
+  it.each([
+    ['name vacío', { name: '' }],
+    ['category con espacios', { category: '   ' }],
+  ])(
+    'PATCH /products/:id con %s debe responder 400 sin modificar datos',
+    async (_case, payload) => {
+      const createResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'Producto para validar PATCH',
+          category: 'Pruebas',
+          quantity: 2,
+          price: 4,
+        })
+        .expect(201);
+      const product = createResponse.body as {
+        id: number;
+        name: string;
+        category: string;
+      };
+
+      await request(app.getHttpServer())
+        .patch(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send(payload)
+        .expect(400);
+
+      const afterResponse = await request(app.getHttpServer())
+        .get(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      const productAfter = afterResponse.body as {
+        name: string;
+        category: string;
+      };
+      expect(productAfter.name).toBe(product.name);
+      expect(productAfter.category).toBe(product.category);
+
+      await request(app.getHttpServer())
+        .delete(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+    },
+  );
+
+  it('PATCH /products/:id parcial con solo price debe seguir siendo válido', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto parcial',
+        category: 'Pruebas',
+        quantity: 2,
+        price: 4,
+      })
+      .expect(201);
+    const product = createResponse.body as {
+      id: number;
+      name: string;
+      category: string;
+      quantity: number;
+    };
+
+    const updateResponse = await request(app.getHttpServer())
+      .patch(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({ price: 7.5 })
+      .expect(200);
+    const updated = updateResponse.body as {
+      name: string;
+      category: string;
+      quantity: number;
+      price: number | string;
+    };
+
+    expect(updated.name).toBe(product.name);
+    expect(updated.category).toBe(product.category);
+    expect(updated.quantity).toBe(product.quantity);
+    expect(Number(updated.price)).toBe(7.5);
+
+    await request(app.getHttpServer())
+      .delete(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
   });
 
   // ── Estadísticas ─────────────────────────────────────────────────────────
