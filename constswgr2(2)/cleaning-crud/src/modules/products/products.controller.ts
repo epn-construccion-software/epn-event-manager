@@ -96,19 +96,11 @@ export class ProductsController {
       });
       return result;
     } catch (error) {
-      this.logger.error('Controlador: error en getStats', {
-        route: '/products/stats',
-        action: 'QUERY',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new HttpException(
-        {
-          statusCode: 500,
-          error: 'Internal Server Error',
-          message: 'Error interno en getStats',
-          timestamp: new Date().toISOString(),
-        },
-        500,
+      this.handleAggregationError(
+        error,
+        '/products/stats',
+        'Controlador: error en getStats',
+        'Error interno en getStats',
       );
     }
   }
@@ -123,21 +115,37 @@ export class ProductsController {
       });
       return result;
     } catch (error) {
-      this.logger.error('Controlador: error en getActiveSummary', {
-        route: '/products/active-summary',
-        action: 'QUERY',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new HttpException(
-        {
-          statusCode: 500,
-          error: 'Internal Server Error',
-          message: 'Error interno en getActiveSummary',
-          timestamp: new Date().toISOString(),
-        },
-        500,
+      this.handleAggregationError(
+        error,
+        '/products/active-summary',
+        'Controlador: error en getActiveSummary',
+        'Error interno en getActiveSummary',
       );
     }
+  }
+
+  // [PREVENTIVE] Shared by los endpoints de agregacion (stats/active-summary)
+  // para responder un 500 uniforme sin duplicar la construccion del error.
+  private handleAggregationError(
+    error: unknown,
+    route: string,
+    logMessage: string,
+    publicMessage: string,
+  ): never {
+    this.logger.error(logMessage, {
+      route,
+      action: 'QUERY',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new HttpException(
+      {
+        statusCode: 500,
+        error: 'Internal Server Error',
+        message: publicMessage,
+        timestamp: new Date().toISOString(),
+      },
+      500,
+    );
   }
 
   @Get(':id')
