@@ -431,8 +431,12 @@ describe('Products API (e2e)', () => {
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(200)
       .expect((res: SupertestResponse) => {
-        expect(Object.keys(res.body).sort()).toEqual(
-          ['activeProducts', 'totalQuantity', 'totalInventoryValue'].sort(),
+        expect(
+          Object.keys(res.body).sort((a, b) => a.localeCompare(b)),
+        ).toEqual(
+          ['activeProducts', 'totalQuantity', 'totalInventoryValue'].sort(
+            (a, b) => a.localeCompare(b),
+          ),
         );
         expect(typeof res.body.activeProducts).toBe('number');
         expect(typeof res.body.totalQuantity).toBe('number');
