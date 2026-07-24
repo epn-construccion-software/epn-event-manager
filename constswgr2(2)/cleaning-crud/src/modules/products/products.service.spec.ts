@@ -305,6 +305,16 @@ describe('ProductsService', () => {
     );
   });
 
+  it('throws NotFoundException when updating a logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 6, deleted: true }));
+
+    await expect(service.update(6, { price: 10 })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   it('wraps unexpected update errors', async () => {
     repo.findOne.mockResolvedValue(makeProductEntity());
     repo.save.mockRejectedValue(new Error('save failed'));
@@ -339,6 +349,15 @@ describe('ProductsService', () => {
 
   it('throws NotFoundException when removing a missing product', async () => {
     await expect(service.remove(404)).rejects.toThrow(NotFoundException);
+  });
+
+  it('throws NotFoundException when removing an already logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 7, deleted: true }));
+
+    await expect(service.remove(7)).rejects.toThrow(NotFoundException);
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.remove).not.toHaveBeenCalled();
   });
 
   it('wraps unexpected remove errors', async () => {
