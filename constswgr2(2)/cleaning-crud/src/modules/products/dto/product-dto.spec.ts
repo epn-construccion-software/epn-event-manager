@@ -38,6 +38,43 @@ describe('Product DTO validation', () => {
     );
   });
 
+  it.each([
+    ['name ausente', { category: 'Cat', quantity: 1, price: 1 }, 'name'],
+    ['category ausente', { name: 'Cloro', quantity: 1, price: 1 }, 'category'],
+    [
+      'name vacío',
+      { name: '', category: 'Cat', quantity: 1, price: 1 },
+      'name',
+    ],
+    [
+      'category con espacios',
+      { name: 'Cloro', category: '   ', quantity: 1, price: 1 },
+      'category',
+    ],
+    [
+      'quantity ausente',
+      { name: 'Cloro', category: 'Cat', price: 1 },
+      'quantity',
+    ],
+    [
+      'quantity no numérico',
+      { name: 'Cloro', category: 'Cat', quantity: 'uno', price: 1 },
+      'quantity',
+    ],
+    ['price ausente', { name: 'Cloro', category: 'Cat', quantity: 1 }, 'price'],
+    [
+      'price no numérico',
+      { name: 'Cloro', category: 'Cat', quantity: 1, price: 'uno' },
+      'price',
+    ],
+  ])('rejects create data with %s', async (_case, payload, property) => {
+    const dto = plainToInstance(CreateProductDto, payload);
+
+    const errors = await validate(dto);
+
+    expect(errors.map(error => error.property)).toContain(property);
+  });
+
   it('accepts partial valid update product data', async () => {
     const dto = plainToInstance(UpdateProductDto, {
       price: 2.75,
@@ -57,5 +94,21 @@ describe('Product DTO validation', () => {
     expect(errors.map(error => error.property)).toEqual(
       expect.arrayContaining(['name', 'quantity']),
     );
+  });
+
+  it.each([
+    ['name vacío', { name: '' }, 'name'],
+    ['name con espacios', { name: '   ' }, 'name'],
+    ['category vacía', { category: '' }, 'category'],
+    ['category con espacios', { category: '   ' }, 'category'],
+    ['price no numérico', { price: 'uno' }, 'price'],
+    ['quantity no numérico', { quantity: 'uno' }, 'quantity'],
+    ['name nulo', { name: null }, 'name'],
+  ])('rejects update data with %s', async (_case, payload, property) => {
+    const dto = plainToInstance(UpdateProductDto, payload);
+
+    const errors = await validate(dto);
+
+    expect(errors.map(error => error.property)).toContain(property);
   });
 });

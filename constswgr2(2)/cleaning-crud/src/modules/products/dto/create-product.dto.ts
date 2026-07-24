@@ -5,6 +5,7 @@ import {
   IsNumber,
   Min,
   IsOptional,
+  Matches,
 } from 'class-validator';
 
 export class CreateProductDto {
@@ -15,11 +16,13 @@ export class CreateProductDto {
 
   @IsNotEmpty()
   @IsString()
+  @Matches(/\S/, { message: 'name no puede contener solo espacios' })
   @MaxLength(100)
   name!: string;
 
   @IsNotEmpty()
   @IsString()
+  @Matches(/\S/, { message: 'category no puede contener solo espacios' })
   @MaxLength(50)
   category!: string;
 
