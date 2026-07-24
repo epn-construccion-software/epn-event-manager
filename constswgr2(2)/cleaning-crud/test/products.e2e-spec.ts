@@ -416,4 +416,109 @@ describe('Products API (e2e)', () => {
         expect(res.body.productsByCategory).toBeDefined();
       });
   });
+
+  // ── Resumen de productos activos ────────────────────────────────────────
+
+  it('GET /products/active-summary sin API key debe responder 401', () => {
+    return request(app.getHttpServer())
+      .get('/products/active-summary')
+      .expect(401);
+  });
+
+  it('GET /products/active-summary debe retornar exactamente los tres campos esperados', () => {
+    return request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200)
+      .expect((res: SupertestResponse) => {
+        expect(Object.keys(res.body).sort()).toEqual(
+          ['activeProducts', 'totalQuantity', 'totalInventoryValue'].sort(),
+        );
+        expect(typeof res.body.activeProducts).toBe('number');
+        expect(typeof res.body.totalQuantity).toBe('number');
+        expect(typeof res.body.totalInventoryValue).toBe('number');
+      });
+  });
+
+  it('GET /products/active-summary debe sumar price * quantity de productos activos y excluir los eliminados', async () => {
+    const beforeResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+    const baseline = beforeResponse.body as {
+      activeProducts: number;
+      totalQuantity: number;
+      totalInventoryValue: number;
+    };
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto Resumen Activo',
+        category: 'Pruebas',
+        quantity: 4,
+        price: 3.5,
+      })
+      .expect(201);
+    const product = createResponse.body as { id: number };
+
+    const afterCreateResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+    const afterCreate = afterCreateResponse.body as {
+      activeProducts: number;
+      totalQuantity: number;
+      totalInventoryValue: number;
+    };
+
+    // Cálculo manual: 4 unidades * 3.5 = 14 agregados al inventario activo
+    expect(afterCreate.activeProducts).toBe(baseline.activeProducts + 1);
+    expect(afterCreate.totalQuantity).toBe(baseline.totalQuantity + 4);
+    expect(afterCreate.totalInventoryValue).toBeCloseTo(
+      baseline.totalInventoryValue + 14,
+      2,
+    );
+
+    await request(app.getHttpServer())
+      .delete(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const afterDeleteResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    // El producto eliminado (lógicamente) ya no debe contarse
+    expect(afterDeleteResponse.body).toMatchObject(baseline);
+  });
+
+  it('GET /products/active-summary no debe alterar /products/stats ni el listado existente', async () => {
+    const summaryResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const statsResponse = await request(app.getHttpServer())
+      .get('/products/stats')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const listResponse = await request(app.getHttpServer())
+      .get('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    expect(summaryResponse.body.activeProducts).toBe(
+      statsResponse.body.totalProducts,
+    );
+    expect(summaryResponse.body.totalQuantity).toBe(
+      statsResponse.body.totalQuantity,
+    );
+    expect(summaryResponse.body.activeProducts).toBe(
+      (listResponse.body as unknown[]).length,
+    );
+  });
 });

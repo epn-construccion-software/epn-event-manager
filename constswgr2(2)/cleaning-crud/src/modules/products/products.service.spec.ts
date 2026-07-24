@@ -398,4 +398,71 @@ describe('ProductsService', () => {
       InternalServerErrorException,
     );
   });
+
+  it('calculates the active products summary', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5 }),
+      makeProductEntity({ id: 2, quantity: 3, price: 10 }),
+    ]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 2,
+      totalQuantity: 5,
+      totalInventoryValue: 40,
+    });
+  });
+
+  it('excludes logically deleted products from the active summary', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5, deleted: false }),
+      makeProductEntity({ id: 2, quantity: 100, price: 100, deleted: true }),
+    ]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 1,
+      totalQuantity: 2,
+      totalInventoryValue: 10,
+    });
+  });
+
+  it('returns zeros when there are no products', async () => {
+    repo.find.mockResolvedValue([]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 0,
+      totalQuantity: 0,
+      totalInventoryValue: 0,
+    });
+  });
+
+  it('does not alter /products/stats behaviour', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5 }),
+    ]);
+
+    const stats = await service.getStats();
+    const summary = await service.getActiveSummary();
+
+    expect(stats.totalProducts).toBe(1);
+    expect(summary.activeProducts).toBe(1);
+  });
+
+  it('wraps unexpected active summary errors', async () => {
+    repo.find.mockRejectedValue(new Error('summary failed'));
+
+    await expect(service.getActiveSummary()).rejects.toThrow(
+      InternalServerErrorException,
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error en getActiveSummary',
+      expect.objectContaining({ error: 'summary failed' }),
+    );
+  });
 });
