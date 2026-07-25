@@ -276,18 +276,14 @@ describe('AppController (e2e)', () => {
       ['action', { ...validEvent, action: '   ' }],
       ['title', { ...validEvent, title: '' }],
     ])('rejects a request when %s is empty', async (_field, payload) => {
-      await supertest(
-        app.getHttpServer() as Parameters<typeof supertest>[0],
-      )
+      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
         .post('/events')
         .send(payload)
         .expect(400);
     });
 
     it('rejects an unsupported action', async () => {
-      await supertest(
-        app.getHttpServer() as Parameters<typeof supertest>[0],
-      )
+      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
         .post('/events')
         .send({
           ...validEvent,
@@ -302,9 +298,7 @@ describe('AppController (e2e)', () => {
       ['number', 25],
       ['null', null],
     ])('rejects payload when it is a %s', async (_type, invalidPayload) => {
-      await supertest(
-        app.getHttpServer() as Parameters<typeof supertest>[0],
-      )
+      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
         .post('/events')
         .send({
           ...validEvent,
@@ -316,9 +310,7 @@ describe('AppController (e2e)', () => {
     it.each(['CREATE', 'UPDATE', 'DELETE', 'QUERY'])(
       'accepts the valid action %s',
       async (action) => {
-        await supertest(
-          app.getHttpServer() as Parameters<typeof supertest>[0],
-        )
+        await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
           .post('/events')
           .send({
             ...validEvent,
