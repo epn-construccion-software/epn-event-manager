@@ -1,12 +1,12 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import supertest from 'supertest';
 import { AppModule } from './../src/app.module';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { CreateEventEntity } from '../src/database/entities/create-event.entity';
-import { UpdateEventEntity } from '../src/database/entities/update-event.entity';
 import { DeleteEventEntity } from '../src/database/entities/delete-event.entity';
 import { QueryEventEntity } from '../src/database/entities/query-event.entity';
+import { UpdateEventEntity } from '../src/database/entities/update-event.entity';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
@@ -132,7 +132,9 @@ describe('AppController (e2e)', () => {
       .get(url)
       .expect(200);
 
-    expect(response.body).toHaveLength(expectedCount);
+    const body = response.body as unknown[];
+
+    expect(body).toHaveLength(expectedCount);
   });
 
   it.each([
@@ -147,7 +149,9 @@ describe('AppController (e2e)', () => {
       .get(url)
       .expect(400);
 
-    const body = response.body as { message: unknown };
+    const body = response.body as {
+      message: unknown;
+    };
 
     expect(body.message).toEqual(expect.stringMatching(/filtro/i));
   });
@@ -159,7 +163,9 @@ describe('AppController (e2e)', () => {
       .get('/events/latest')
       .expect(200);
 
-    const body = response.body as Array<{ id: number }>;
+    const body = response.body as Array<{
+      id: number;
+    }>;
 
     expect(body.map((event) => event.id)).toEqual([4, 3, 2, 1]);
   });
@@ -171,7 +177,9 @@ describe('AppController (e2e)', () => {
       .get('/events/latest?limit=2')
       .expect(200);
 
-    const body = response.body as Array<{ id: number }>;
+    const body = response.body as Array<{
+      id: number;
+    }>;
 
     expect(body).toHaveLength(2);
     expect(body.map((event) => event.id)).toEqual([4, 3]);
@@ -188,7 +196,9 @@ describe('AppController (e2e)', () => {
       .get(url)
       .expect(400);
 
-    const body = response.body as { message: unknown };
+    const body = response.body as {
+      message: unknown;
+    };
 
     expect(body.message).toEqual(expect.stringMatching(/limit/i));
   });
@@ -231,7 +241,9 @@ describe('AppController (e2e)', () => {
       .get('/events/latest')
       .expect(200);
 
-    expect(response.body).toEqual([]);
+    const body = response.body as unknown[];
+
+    expect(body).toEqual([]);
 
     await emptyApp.close();
   });
@@ -249,6 +261,13 @@ describe('AppController (e2e)', () => {
       },
     };
 
+    const invalidPayloadCases: Array<[string, unknown]> = [
+      ['string', 'invalid payload'],
+      ['array', [{ id: 1 }]],
+      ['number', 25],
+      ['null', null],
+    ];
+
     it.each([
       ['source', { ...validEvent, source: undefined }],
       ['entity', { ...validEvent, entity: undefined }],
@@ -262,12 +281,13 @@ describe('AppController (e2e)', () => {
         .send(payload)
         .expect(400);
 
-      expect(response.body).toEqual(
-        expect.objectContaining({
-          statusCode: 400,
-          message: expect.anything(),
-        }),
-      );
+      const body = response.body as {
+        statusCode: number;
+        message: unknown;
+      };
+
+      expect(body.statusCode).toBe(400);
+      expect(body.message).toBeDefined();
     });
 
     it.each([
@@ -292,20 +312,18 @@ describe('AppController (e2e)', () => {
         .expect(400);
     });
 
-    it.each([
-      ['string', 'invalid payload'],
-      ['array', [{ id: 1 }]],
-      ['number', 25],
-      ['null', null],
-    ])('rejects payload when it is a %s', async (_type, invalidPayload) => {
-      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
-        .post('/events')
-        .send({
-          ...validEvent,
-          payload: invalidPayload,
-        })
-        .expect(400);
-    });
+    it.each(invalidPayloadCases)(
+      'rejects payload when it is a %s',
+      async (_type: string, invalidPayload: unknown) => {
+        await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
+          .post('/events')
+          .send({
+            ...validEvent,
+            payload: invalidPayload,
+          })
+          .expect(400);
+      },
+    );
 
     it.each(['CREATE', 'UPDATE', 'DELETE', 'QUERY'])(
       'accepts the valid action %s',
