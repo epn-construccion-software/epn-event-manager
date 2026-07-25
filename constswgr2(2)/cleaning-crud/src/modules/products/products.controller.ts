@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Body,
+  Query,
   Patch,
   Param,
   Delete,
@@ -14,6 +15,7 @@ import {
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { SearchProductsDto } from './dto/search-products.dto';
 import { LoggerService } from '../../services/logger.service';
 
 @Controller('products')
@@ -59,9 +61,9 @@ export class ProductsController {
   }
 
   @Get()
-  async findAll() {
+  async findAll(@Query() filters: SearchProductsDto = {}) {
     try {
-      const result = await this.productsService.findAll();
+      const result = await this.productsService.findAll(filters);
       this.logger.info('Controlador: productos listados', {
         route: '/products',
         action: 'QUERY',
