@@ -19,7 +19,7 @@ export class CreateEventDto {
   @Matches(/\S/, {
     message: 'source no puede estar vacío',
   })
-  source: string;
+  source!: string;
 
   @IsString({
     message: 'entity debe ser una cadena de texto',
@@ -30,7 +30,7 @@ export class CreateEventDto {
   @Matches(/\S/, {
     message: 'entity no puede estar vacío',
   })
-  entity: string;
+  entity!: string;
 
   @IsString({
     message: 'action debe ser una cadena de texto',
@@ -41,7 +41,7 @@ export class CreateEventDto {
   @IsIn(VALID_ACTIONS, {
     message: 'action debe ser CREATE, UPDATE, DELETE o QUERY',
   })
-  action: string;
+  action!: string;
 
   @IsString({
     message: 'title debe ser una cadena de texto',
@@ -52,7 +52,7 @@ export class CreateEventDto {
   @Matches(/\S/, {
     message: 'title no puede estar vacío',
   })
-  title: string;
+  title!: string;
 
   @IsOptional()
   @IsString({
@@ -63,5 +63,5 @@ export class CreateEventDto {
   @IsObject({
     message: 'payload debe ser un objeto',
   })
-  payload: Record<string, unknown>;
+  payload!: Record<string, unknown>;
 }
