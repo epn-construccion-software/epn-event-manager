@@ -164,6 +164,120 @@ describe('Products API (e2e)', () => {
       .expect(200);
   });
 
+  // ── Búsqueda por nombre y categoría ──────────────────────────────────────
+
+  describe('GET /products con filtros', () => {
+    let matchingId: number;
+    let sameNameId: number;
+    let sameCategoryId: number;
+
+    beforeAll(async () => {
+      const matchingResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Cloro',
+          category: 'CategoriaJosue',
+          quantity: 3,
+          price: 2,
+        })
+        .expect(201);
+      matchingId = (matchingResponse.body as { id: number }).id;
+
+      const sameNameResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Gel',
+          category: 'OtraCategoria',
+          quantity: 4,
+          price: 3,
+        })
+        .expect(201);
+      sameNameId = (sameNameResponse.body as { id: number }).id;
+
+      const sameCategoryResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'Producto Distinto',
+          category: 'CategoriaJosue',
+          quantity: 5,
+          price: 4,
+        })
+        .expect(201);
+      sameCategoryId = (sameCategoryResponse.body as { id: number }).id;
+    });
+
+    afterAll(async () => {
+      for (const id of [sameNameId, sameCategoryId]) {
+        if (id) {
+          await request(app.getHttpServer())
+            .delete(`/products/${id}`)
+            .set('X-FIS-EPN-KEY', API_KEY);
+        }
+      }
+    });
+
+    it('busca parcialmente por nombre ignorando mayúsculas y espacios', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: '  FILTROJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameNameId]));
+      expect(ids).not.toContain(sameCategoryId);
+    });
+
+    it('busca por categoría normalizada usando coincidencia exacta', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ category: '  CATEGORIAJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameCategoryId]));
+      expect(ids).not.toContain(sameNameId);
+    });
+
+    it('combina los filtros name y category usando AND', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({
+          name: 'filtrojosue',
+          category: 'categoriajosue',
+        })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        expect.objectContaining({ id: matchingId }),
+      ]);
+    });
+
+    it('excluye de la búsqueda los productos eliminados', async () => {
+      await request(app.getHttpServer())
+        .delete(`/products/${matchingId}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: 'FiltroJosue Cloro' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+  });
+
   // ── Errores 404 ───────────────────────────────────────────────────────────
 
   it('GET /products/:id después de eliminar debe responder 404', () => {
