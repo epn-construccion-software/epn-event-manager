@@ -303,27 +303,4 @@ export class EventsService {
     const parsedDate = new Date(rawDate).getTime();
     return Number.isNaN(parsedDate) ? 0 : parsedDate;
   }
-
-  async getStats(): Promise<object> {
-    this.logger.log(
-      JSON.stringify({
-        context: EventsService.name,
-        operation: 'getStats',
-        status: 'query',
-        message: 'Retrieving event statistics',
-      }),
-    );
-    const createCount = await this.createEventsRepository.count();
-    const updateCount = await this.updateEventsRepository.count();
-    const deleteCount = await this.deleteEventsRepository.count();
-    const queryCount = await this.queryEventsRepository.count();
-
-    return {
-      create: createCount,
-      update: updateCount,
-      delete: deleteCount,
-      query: queryCount,
-      total: createCount + updateCount + deleteCount + queryCount,
-    };
-  }
 }

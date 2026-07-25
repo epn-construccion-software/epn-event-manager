@@ -446,21 +446,4 @@ describe('EventsService', () => {
       expect(createRepo.find).not.toHaveBeenCalled();
     });
   });
-
-  it('should include QUERY events in stats total', async () => {
-    createRepo.count.mockResolvedValue(2);
-    updateRepo.count.mockResolvedValue(3);
-    deleteRepo.count.mockResolvedValue(1);
-    queryRepo.count.mockResolvedValue(4);
-
-    const result = await service.getStats();
-
-    expect(result).toEqual({
-      create: 2,
-      update: 3,
-      delete: 1,
-      query: 4,
-      total: 10,
-    });
-  });
 });

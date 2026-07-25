@@ -1,20 +1,21 @@
-import { EventsService } from '../events/events.service';
 import { StatsController } from './stats.controller';
+import { StatsService } from './stats.service';
 
-type EventsServiceMock = jest.Mocked<Pick<EventsService, 'getStats'>>;
+type StatsServiceMock = jest.Mocked<Pick<StatsService, 'getStats'>>;
 
 describe('StatsController', () => {
   let controller: StatsController;
-  let eventsService: EventsServiceMock;
+  let statsService: StatsServiceMock;
 
   beforeEach(() => {
-    eventsService = {
+    statsService = {
       getStats: jest.fn(),
     };
-    controller = new StatsController(eventsService as unknown as EventsService);
+
+    controller = new StatsController(statsService as unknown as StatsService);
   });
 
-  it('getStats calls EventsService.getStats and returns received statistics', async () => {
+  it('getStats llama a StatsService.getStats y devuelve las estadísticas recibidas', async () => {
     const stats = {
       create: 2,
       update: 1,
@@ -22,9 +23,10 @@ describe('StatsController', () => {
       query: 3,
       total: 6,
     };
-    eventsService.getStats.mockResolvedValue(stats);
+
+    statsService.getStats.mockResolvedValue(stats);
 
     await expect(controller.getStats()).resolves.toBe(stats);
-    expect(eventsService.getStats).toHaveBeenCalledTimes(1);
+    expect(statsService.getStats).toHaveBeenCalledTimes(1);
   });
 });
