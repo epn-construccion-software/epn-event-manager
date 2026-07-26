@@ -53,79 +53,43 @@ describe('StatsController (e2e)', () => {
     return app;
   };
 
-  it('/stats (GET) returns numeric counts and a total when repositories have data', async () => {
-    const app = await buildApp([2, 1, 0, 3]);
+  it.each([
+    [
+      'returns numeric counts and a total when repositories have data',
+      [2, 1, 0, 3],
+      { create: 2, update: 1, delete: 0, query: 3, total: 6 },
+    ],
+    [
+      'returns five zero values when all repositories are empty',
+      [0, 0, 0, 0],
+      { create: 0, update: 0, delete: 0, query: 0, total: 0 },
+    ],
+    [
+      'normalizes null, undefined and non-numeric counts to zero instead of NaN',
+      [null, undefined, 'abc', NaN],
+      { create: 0, update: 0, delete: 0, query: 0, total: 0 },
+    ],
+  ] as Array<[string, [unknown, unknown, unknown, unknown], object]>)(
+    '/stats (GET) %s',
+    async (_description, counts, expectedBody) => {
+      const app = await buildApp(counts);
 
-    const response = await supertest(
-      app.getHttpServer() as Parameters<typeof supertest>[0],
-    )
-      .get('/stats')
-      .expect(200);
+      const response = await supertest(
+        app.getHttpServer() as Parameters<typeof supertest>[0],
+      )
+        .get('/stats')
+        .expect(200);
 
-    const body = response.body as Record<string, number>;
+      const body = response.body as Record<string, number>;
 
-    expect(body).toEqual({
-      create: 2,
-      update: 1,
-      delete: 0,
-      query: 3,
-      total: 6,
-    });
+      expect(body).toEqual(expectedBody);
 
-    await app.close();
-  });
+      Object.values(body).forEach((value) => {
+        expect(typeof value).toBe('number');
+        expect(Number.isNaN(value)).toBe(false);
+      });
 
-  it('/stats (GET) returns five zero values when all repositories are empty', async () => {
-    const app = await buildApp([0, 0, 0, 0]);
-
-    const response = await supertest(
-      app.getHttpServer() as Parameters<typeof supertest>[0],
-    )
-      .get('/stats')
-      .expect(200);
-
-    const body = response.body as Record<string, number>;
-
-    expect(body).toEqual({
-      create: 0,
-      update: 0,
-      delete: 0,
-      query: 0,
-      total: 0,
-    });
-
-    Object.values(body).forEach((value) => {
-      expect(typeof value).toBe('number');
-      expect(Number.isNaN(value)).toBe(false);
-    });
-
-    await app.close();
-  });
-
-  it('/stats (GET) normalizes null, undefined and non-numeric counts to zero instead of NaN', async () => {
-    const app = await buildApp([null, undefined, 'abc', NaN]);
-
-    const response = await supertest(
-      app.getHttpServer() as Parameters<typeof supertest>[0],
-    )
-      .get('/stats')
-      .expect(200);
-
-    const body = response.body as Record<string, number>;
-
-    expect(body).toEqual({
-      create: 0,
-      update: 0,
-      delete: 0,
-      query: 0,
-      total: 0,
-    });
-
-    Object.values(body).forEach((value) => {
-      expect(typeof value).toBe('number');
-      expect(Number.isNaN(value)).toBe(false);
-    });
-
-    await app.close();
-  });
+      await app.close();
+    },
+  );
 });
