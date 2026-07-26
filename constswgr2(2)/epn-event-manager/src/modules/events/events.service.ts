@@ -6,6 +6,11 @@ import { CreateEventEntity } from '../../database/entities/create-event.entity';
 import { UpdateEventEntity } from '../../database/entities/update-event.entity';
 import { DeleteEventEntity } from '../../database/entities/delete-event.entity';
 import { QueryEventEntity } from '../../database/entities/query-event.entity';
+import { EventFiltersDto } from './dto/event-filters.dto';
+import { LatestEventsQueryDto } from './dto/latest-events-query.dto';
+
+const LOCAL_DATE_PATTERN = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4}),?\s+(.+)$/;
+const LOCAL_TIME_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(.*)$/;
 
 @Injectable()
 export class EventsService {
@@ -13,20 +18,20 @@ export class EventsService {
 
   constructor(
     @InjectRepository(CreateEventEntity)
-    private readonly createRepo: Repository<CreateEventEntity>,
+    private readonly createEventsRepository: Repository<CreateEventEntity>,
     @InjectRepository(UpdateEventEntity)
-    private readonly updateRepo: Repository<UpdateEventEntity>,
+    private readonly updateEventsRepository: Repository<UpdateEventEntity>,
     @InjectRepository(DeleteEventEntity)
-    private readonly deleteRepo: Repository<DeleteEventEntity>,
+    private readonly deleteEventsRepository: Repository<DeleteEventEntity>,
     @InjectRepository(QueryEventEntity)
-    private readonly queryRepo: Repository<QueryEventEntity>,
+    private readonly queryEventsRepository: Repository<QueryEventEntity>,
   ) {}
 
   async registerEvent(dto: CreateEventDto): Promise<{ ok: boolean }> {
     const action = (dto.action ?? '').toUpperCase();
-    const payloadStr = JSON.stringify(dto.payload ?? {});
+    const serializedPayload = JSON.stringify(dto.payload ?? {});
     // Fecha guardada en formato local, no UTC (debilidad intencional)
-    const localDate = new Date().toLocaleString();
+    const capturedAt = new Date().toLocaleString();
 
     this.logger.log(
       JSON.stringify({
@@ -41,16 +46,16 @@ export class EventsService {
     );
 
     if (action === 'CREATE') {
-      const ev = this.createRepo.create({
+      const createEventRecord = this.createEventsRepository.create({
         source: dto.source,
         entity: dto.entity,
         action: dto.action,
         title: dto.title,
         description: dto.description,
-        payload: payloadStr,
-        recorded_at: localDate,
+        payload: serializedPayload,
+        recorded_at: capturedAt,
       });
-      await this.createRepo.save(ev);
+      await this.createEventsRepository.save(createEventRecord);
       this.logger.log(
         JSON.stringify({
           context: EventsService.name,
@@ -66,16 +71,16 @@ export class EventsService {
     }
 
     if (action === 'UPDATE') {
-      const ev = this.updateRepo.create({
+      const updateEventRecord = this.updateEventsRepository.create({
         source: dto.source,
         entity: dto.entity,
         action: dto.action,
         title: dto.title,
         description: dto.description,
-        payload: payloadStr,
-        timestamp: localDate,
+        payload: serializedPayload,
+        timestamp: capturedAt,
       });
-      await this.updateRepo.save(ev);
+      await this.updateEventsRepository.save(updateEventRecord);
       this.logger.log(
         JSON.stringify({
           context: EventsService.name,
@@ -92,15 +97,15 @@ export class EventsService {
 
     if (action === 'DELETE') {
       // CORRECCIÓN: crear la entidad y persistirla correctamente.
-      const ev = this.deleteRepo.create({
+      const deleteEventRecord = this.deleteEventsRepository.create({
         source: dto.source,
         entity: dto.entity,
         action: dto.action,
         title: dto.title,
-        payload: payloadStr,
-        createdAt: localDate,
+        payload: serializedPayload,
+        createdAt: capturedAt,
       });
-      await this.deleteRepo.save(ev);
+      await this.deleteEventsRepository.save(deleteEventRecord);
       this.logger.log(
         JSON.stringify({
           context: EventsService.name,
@@ -116,16 +121,16 @@ export class EventsService {
     }
 
     if (action === 'QUERY') {
-      const ev = this.queryRepo.create({
+      const queryEventRecord = this.queryEventsRepository.create({
         source: dto.source,
         entity: dto.entity,
         action: dto.action,
         title: dto.title,
         description: dto.description,
-        payload: payloadStr,
-        event_date: localDate,
+        payload: serializedPayload,
+        event_date: capturedAt,
       });
-      await this.queryRepo.save(ev);
+      await this.queryEventsRepository.save(queryEventRecord);
       this.logger.log(
         JSON.stringify({
           context: EventsService.name,
@@ -154,40 +159,60 @@ export class EventsService {
     throw new BadRequestException('Acción no válida');
   }
 
-  async findAll(): Promise<object[]> {
+  async findAll(filters: EventFiltersDto = {}): Promise<object[]> {
+    const validatedFilters = EventFiltersDto.validate(filters);
+    const hasFilters = Object.keys(validatedFilters).length > 0;
+
     this.logger.log(
       JSON.stringify({
         context: EventsService.name,
         operation: 'findAll',
+        filters: validatedFilters,
         status: 'query',
         message: 'Retrieving all events',
       }),
     );
     // Incidencia perfectiva: agrega 4 tablas en memoria sin orden garantizado
-    const creates = await this.createRepo.find();
-    const updates = await this.updateRepo.find();
-    const deletes = await this.deleteRepo.find();
-    const queries = await this.queryRepo.find();
+    const createEvents = hasFilters
+      ? await this.createEventsRepository.findBy(validatedFilters)
+      : await this.createEventsRepository.find();
+    const updateEvents = hasFilters
+      ? await this.updateEventsRepository.findBy(validatedFilters)
+      : await this.updateEventsRepository.find();
+    const deleteEvents = hasFilters
+      ? await this.deleteEventsRepository.findBy(validatedFilters)
+      : await this.deleteEventsRepository.find();
+    const queryEvents = hasFilters
+      ? await this.queryEventsRepository.findBy(validatedFilters)
+      : await this.queryEventsRepository.find();
 
     // Ordena lexicograficamente por strings de fecha heterogeneos (incorrecto)
-    const merged = [
-      ...creates.map((e) => ({ ...e, _table: 'create_events' })),
-      ...updates.map((e) => ({ ...e, _table: 'update_events' })),
-      ...deletes.map((e) => ({ ...e, _table: 'delete_events' })),
-      ...queries.map((e) => ({ ...e, _table: 'query_events' })),
+    const mergedEvents = [
+      ...createEvents.map((e) => ({ ...e, _table: 'create_events' })),
+      ...updateEvents.map((e) => ({ ...e, _table: 'update_events' })),
+      ...deleteEvents.map((e) => ({ ...e, _table: 'delete_events' })),
+      ...queryEvents.map((e) => ({ ...e, _table: 'query_events' })),
     ];
 
-    merged.sort((a, b) => {
-      const ra = a as unknown as Record<string, string>;
-      const rb = b as unknown as Record<string, string>;
-      const ta =
-        ra.recorded_at ?? ra.timestamp ?? ra.createdAt ?? ra.event_date ?? '';
-      const tb =
-        rb.recorded_at ?? rb.timestamp ?? rb.createdAt ?? rb.event_date ?? '';
-      return ta.localeCompare(tb);
+    mergedEvents.sort((eventA, eventB) => {
+      const recordA = eventA as unknown as Record<string, string>;
+      const recordB = eventB as unknown as Record<string, string>;
+      const dateA =
+        recordA.recorded_at ??
+        recordA.timestamp ??
+        recordA.createdAt ??
+        recordA.event_date ??
+        '';
+      const dateB =
+        recordB.recorded_at ??
+        recordB.timestamp ??
+        recordB.createdAt ??
+        recordB.event_date ??
+        '';
+      return dateA.localeCompare(dateB);
     });
 
-    return merged;
+    return mergedEvents;
   }
 
   async findBySource(source: string): Promise<object[]> {
@@ -200,11 +225,11 @@ export class EventsService {
         message: 'Retrieving events by source',
       }),
     );
-    const creates = await this.createRepo.findBy({ source });
-    const updates = await this.updateRepo.findBy({ source });
-    const deletes = await this.deleteRepo.findBy({ source });
-    const queries = await this.queryRepo.findBy({ source });
-    return [...creates, ...updates, ...deletes, ...queries];
+    const createEvents = await this.createEventsRepository.findBy({ source });
+    const updateEvents = await this.updateEventsRepository.findBy({ source });
+    const deleteEvents = await this.deleteEventsRepository.findBy({ source });
+    const queryEvents = await this.queryEventsRepository.findBy({ source });
+    return [...createEvents, ...updateEvents, ...deleteEvents, ...queryEvents];
   }
 
   async findByEntity(entity: string): Promise<object[]> {
@@ -218,33 +243,108 @@ export class EventsService {
       }),
     );
     // Incidencia preventiva: parametro entity usado directamente sin sanitizar
-    const creates = await this.createRepo.findBy({ entity });
-    const updates = await this.updateRepo.findBy({ entity });
-    const deletes = await this.deleteRepo.findBy({ entity });
-    const queries = await this.queryRepo.findBy({ entity });
-    return [...creates, ...updates, ...deletes, ...queries];
+    const createEvents = await this.createEventsRepository.findBy({ entity });
+    const updateEvents = await this.updateEventsRepository.findBy({ entity });
+    const deleteEvents = await this.deleteEventsRepository.findBy({ entity });
+    const queryEvents = await this.queryEventsRepository.findBy({ entity });
+    return [...createEvents, ...updateEvents, ...deleteEvents, ...queryEvents];
   }
 
-  async getStats(): Promise<object> {
+  async findLatest(rawLimit?: unknown): Promise<object[]> {
+    const limit = LatestEventsQueryDto.validate(rawLimit);
+
     this.logger.log(
       JSON.stringify({
         context: EventsService.name,
-        operation: 'getStats',
+        operation: 'findLatest',
+        limit,
         status: 'query',
-        message: 'Retrieving event statistics',
+        message: 'Retrieving latest events',
       }),
     );
-    const createCount = await this.createRepo.count();
-    const updateCount = await this.updateRepo.count();
-    const deleteCount = await this.deleteRepo.count();
-    const queryCount = await this.queryRepo.count();
 
-    return {
-      create: createCount,
-      update: updateCount,
-      delete: deleteCount,
-      query: queryCount,
-      total: createCount + updateCount + deleteCount + queryCount,
-    };
+    const [createEvents, updateEvents, deleteEvents, queryEvents] =
+      await Promise.all([
+        this.createEventsRepository.find(),
+        this.updateEventsRepository.find(),
+        this.deleteEventsRepository.find(),
+        this.queryEventsRepository.find(),
+      ]);
+
+    const mergedEvents = [
+      ...createEvents.map((e) => ({ ...e, _table: 'create_events' })),
+      ...updateEvents.map((e) => ({ ...e, _table: 'update_events' })),
+      ...deleteEvents.map((e) => ({ ...e, _table: 'delete_events' })),
+      ...queryEvents.map((e) => ({ ...e, _table: 'query_events' })),
+    ];
+
+    return mergedEvents
+      .map((event) => ({
+        event,
+        sortTimestamp: this.normalizeEventTimestamp(
+          event as unknown as Record<string, unknown>,
+        ),
+      }))
+      .sort((eventA, eventB) => eventB.sortTimestamp - eventA.sortTimestamp)
+      .slice(0, limit)
+      .map(({ event }) => event);
+  }
+
+  // Homogeneiza los distintos nombres/formatos de fecha de las 4 tablas
+  // (recorded_at, timestamp, createdAt, event_date) a un timestamp comparable.
+  private normalizeEventTimestamp(event: Record<string, unknown>): number {
+    const rawDate =
+      event.recorded_at ??
+      event.timestamp ??
+      event.createdAt ??
+      event.event_date;
+
+    if (typeof rawDate !== 'string' || rawDate.trim() === '') {
+      return 0;
+    }
+
+    const parsedDate = new Date(rawDate).getTime();
+    if (!Number.isNaN(parsedDate)) {
+      return parsedDate;
+    }
+
+    return this.parseLocalEventTimestamp(rawDate);
+  }
+
+  private parseLocalEventTimestamp(rawDate: string): number {
+    const dateParts = LOCAL_DATE_PATTERN.exec(rawDate.trim());
+    if (!dateParts) {
+      return 0;
+    }
+
+    const timeParts = LOCAL_TIME_PATTERN.exec(dateParts[4]);
+    if (!timeParts) {
+      return 0;
+    }
+
+    const day = Number(dateParts[1]);
+    const month = Number(dateParts[2]);
+    const year = Number(dateParts[3]);
+    let hour = Number(timeParts[1]);
+    const minute = Number(timeParts[2]);
+    const second = Number(timeParts[3] ?? 0);
+    const period = timeParts[4].toLowerCase().replace(/[\s.]/g, '');
+
+    if (period !== '' && period !== 'am' && period !== 'pm') {
+      return 0;
+    }
+    if (period === 'pm' && hour < 12) hour += 12;
+    if (period === 'am' && hour === 12) hour = 0;
+
+    const normalizedDate = new Date(year, month - 1, day, hour, minute, second);
+    if (
+      normalizedDate.getFullYear() !== year ||
+      normalizedDate.getMonth() !== month - 1 ||
+      normalizedDate.getDate() !== day
+    ) {
+      return 0;
+    }
+
+    return normalizedDate.getTime();
   }
 }

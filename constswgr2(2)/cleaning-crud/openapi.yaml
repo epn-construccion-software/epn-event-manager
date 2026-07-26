@@ -37,6 +37,22 @@ paths:
       responses:
         '200':
           description: Estadísticas
+  /products/active-summary:
+    get:
+      summary: Resumen breve del inventario activo
+      description: >
+        Devuelve un resumen breve y distinto de /products/stats: cantidad de
+        productos activos, unidades totales y valor total del inventario
+        (price * quantity), excluyendo productos eliminados lógicamente.
+      security:
+        - apiKey: []
+      responses:
+        '200':
+          description: Resumen de productos activos
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActiveProductsSummary'
   /products/{id}:
     get:
       summary: Obtener producto por ID
@@ -112,4 +128,13 @@ components:
         - category
         - quantity
         - price
+    ActiveProductsSummary:
+      type: object
+      properties:
+        activeProducts:
+          type: integer
+        totalQuantity:
+          type: integer
+        totalInventoryValue:
+          type: number
 

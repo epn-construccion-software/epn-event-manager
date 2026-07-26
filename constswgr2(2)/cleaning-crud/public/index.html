@@ -26,9 +26,384 @@
             </div>
         </header>
 
+        <nav class="demo-nav" aria-label="Navegación de la demostración">
+            <button type="button" class="nav-item active" data-view="dashboard">Dashboard</button>
+            <button type="button" class="nav-item" data-view="products">Productos</button>
+            <button type="button" class="nav-item" data-view="search">Búsqueda</button>
+            <button type="button" class="nav-item" data-view="inventory">Inventario</button>
+            <button type="button" class="nav-item" data-view="events">Eventos</button>
+            <button type="button" class="nav-item" data-view="stats">Estadísticas</button>
+            <button type="button" class="nav-item" data-view="evidence">Evidencia del release</button>
+        </nav>
+        <div id="appNotification" class="app-notification" role="status" aria-live="polite"></div>
+
         <main class="main-content">
+            <!-- Configuración de la demostración -->
+            <section id="dashboard" class="demo-section app-view active" data-view="dashboard" aria-labelledby="dashboardTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Release v1.2.0</p>
+                        <h2 id="dashboardTitle">📊 Dashboard</h2>
+                        <p class="section-description">
+                            Resumen operativo del inventario, la trazabilidad y el acceso protegido.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <article class="metric-card">
+                        <span>Productos activos</span>
+                        <strong id="dashboardActiveProducts">—</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Total de productos</span>
+                        <strong id="dashboardTotalProducts">—</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Cantidad en inventario</span>
+                        <strong id="dashboardTotalQuantity">—</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Valor del inventario</span>
+                        <strong id="dashboardInventoryValue">—</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Eventos recientes</span>
+                        <strong id="dashboardRecentEvents">—</strong>
+                    </article>
+                    <article class="metric-card">
+                        <span>Operaciones registradas</span>
+                        <strong id="dashboardOperations">—</strong>
+                    </article>
+                </div>
+                <p id="dashboardAccessMessage" class="protected-data-message">
+                    Valida la API Key para cargar el resumen operativo del sistema.
+                </p>
+
+                <div class="dashboard-lower-grid">
+                    <article class="access-card">
+                        <div class="access-card-heading">
+                            <div>
+                                <h3>🔐 Acceso protegido</h3>
+                                <p>Ingresa la API Key configurada en el backend para habilitar operaciones protegidas.</p>
+                            </div>
+                            <span id="apiKeyStatus" class="key-status not-configured">Acceso no validado</span>
+                        </div>
+                        <div class="api-key-controls">
+                            <div class="form-group api-key-field">
+                                <label for="apiKeyInput">API Key configurada en backend</label>
+                                <input
+                                    type="password"
+                                    id="apiKeyInput"
+                                    autocomplete="off"
+                                    placeholder="Ingresa la API Key definida en el .env local"
+                                >
+                            </div>
+                            <button id="saveApiKeyBtn" type="button" class="btn btn-primary">Validar acceso</button>
+                            <button id="clearApiKeyBtn" type="button" class="btn btn-secondary">Cerrar acceso</button>
+                        </div>
+                        <p id="apiKeyFeedback" class="inline-feedback" role="status"></p>
+                        <p class="access-detail">Header utilizado: <code>X-FIS-EPN-KEY</code>.</p>
+                    </article>
+                    <article class="connection-card">
+                        <h3>Estado de servicios</h3>
+                        <div class="connection-row"><span>cleaning-crud</span><span id="dashboardCrudStatus" class="connection-value">Verificando...</span></div>
+                        <div class="connection-row"><span>epn-event-manager</span><span id="dashboardHubStatus" class="connection-value">Verificando...</span></div>
+                        <div class="connection-row"><span>Acceso protegido</span><span id="dashboardAccessStatus" class="connection-value">No validado</span></div>
+                    </article>
+                </div>
+            </section>
+
+            <section id="protectedViewNotice" class="protected-view-notice" hidden>
+                <div class="protected-view-card">
+                    <span class="protected-view-icon" aria-hidden="true">🔐</span>
+                    <h2>Acceso requerido</h2>
+                    <p id="protectedViewDescription">Valida la API Key configurada en el backend para consultar información operativa del sistema.</p>
+                    <button type="button" id="goToAccessBtn" class="btn btn-primary">Ir a validar acceso</button>
+                </div>
+            </section>
+
+            <section id="busqueda-productos" class="demo-section app-view" data-view="search" aria-labelledby="searchDemoTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Catálogo</p>
+                        <h2 id="searchDemoTitle">🔎 Búsqueda de productos</h2>
+                        <p class="section-description">Busca por un criterio o combina ambos mediante condición AND.</p>
+                    </div>
+                </div>
+                <div class="search-demo-grid">
+                    <label>Nombre
+                        <input type="text" id="productNameFilter" placeholder="Ej. cloro">
+                    </label>
+                    <label>Categoría
+                        <select id="productCategoryFilter">
+                            <option value="">Todas las categorías</option>
+                            <option value="desinfectantes">desinfectantes</option>
+                            <option value="detergentes">detergentes</option>
+                            <option value="papel">papel</option>
+                            <option value="otro">otro</option>
+                        </select>
+                    </label>
+                </div>
+                <div class="functional-actions">
+                    <button type="button" class="btn btn-primary" data-request="products-search">Buscar</button>
+                    <button type="button" id="clearProductFiltersBtn" class="btn btn-secondary">Limpiar filtros</button>
+                </div>
+                <div id="searchResults" class="product-grid business-results">
+                    <div class="empty-state"><div class="empty-state-text">Configura los criterios y selecciona Buscar.</div></div>
+                </div>
+            </section>
+
+            <section id="resumen-inventario" class="demo-section app-view" data-view="inventory" aria-labelledby="inventoryDemoTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Indicadores de productos</p>
+                        <h2 id="inventoryDemoTitle">📊 Resumen de inventario</h2>
+                        <p class="section-description">
+                            Revisa productos activos, cantidad total, valor del inventario y estadísticas existentes.
+                        </p>
+                    </div>
+                </div>
+                <div class="dashboard-grid inventory-metrics">
+                    <article class="metric-card"><span>Productos activos</span><strong id="inventoryActiveProducts">—</strong></article>
+                    <article class="metric-card"><span>Cantidad total en inventario</span><strong id="inventoryTotalQuantity">—</strong></article>
+                    <article class="metric-card"><span>Valor total del inventario</span><strong id="inventoryTotalValue">—</strong></article>
+                </div>
+                <p class="inventory-explanation">El valor del inventario se calcula con precio unitario por cantidad para productos activos.</p>
+                <div class="functional-actions">
+                    <button type="button" class="btn btn-primary" data-request="products-summary">Actualizar resumen</button>
+                    <button type="button" class="btn btn-secondary" data-request="products-stats">Consultar estadísticas de productos</button>
+                </div>
+                <div id="productStatsSummary" class="business-message">Las estadísticas de productos aparecerán aquí.</div>
+                <small class="data-source">Fuente: GET /products/active-summary</small>
+            </section>
+
+            <section id="eventos" class="demo-section app-view" data-view="events" aria-labelledby="eventsDemoTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Trazabilidad</p>
+                        <h2 id="eventsDemoTitle">🧭 Eventos</h2>
+                        <p class="events-context-note">Los eventos mostrados corresponden a la trazabilidad generada por cleaning-crud y registrada en EPN Event Manager.</p>
+                        <p class="events-context-note">Las opciones de origen y entidad se generan a partir de los eventos registrados disponibles.</p>
+                    </div>
+                </div>
+                <div class="event-tabs" role="tablist" aria-label="Navegación interna de Eventos">
+                    <button type="button" class="event-tab active" data-event-view="history" role="tab">Historial</button>
+                    <button type="button" class="event-tab" data-event-view="recent" role="tab">Actividad reciente</button>
+                </div>
+
+                <div class="event-subview active-event-subview" data-event-subview="history">
+                    <h3>Historial de eventos</h3>
+                    <p class="section-description">Consulta la trazabilidad del sistema filtrando eventos por tipo de acción, origen y entidad afectada.</p>
+                    <div class="event-filter-grid">
+                        <label>Tipo de acción
+                            <select id="eventActionFilter">
+                                <option value="">Todas las acciones</option>
+                                <option value="CREATE">CREATE</option>
+                                <option value="UPDATE">UPDATE</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="QUERY">QUERY</option>
+                            </select>
+                        </label>
+                        <label>Origen del evento
+                            <select id="eventSourceFilter">
+                                <option value="">Todos los orígenes</option>
+                                <option value="cleaning-crud">cleaning-crud</option>
+                            </select>
+                        </label>
+                        <label>Entidad afectada
+                            <select id="eventEntityFilter">
+                                <option value="">Todas las entidades</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="functional-actions">
+                        <button type="button" class="btn btn-primary" data-request="events-filtered">Filtrar eventos</button>
+                        <button type="button" id="clearEventFiltersBtn" class="btn btn-secondary">Limpiar filtros</button>
+                        <button type="button" id="clearEventSearchBtn" class="btn btn-secondary">Limpiar búsqueda</button>
+                        <button type="button" class="btn btn-secondary" data-request="events">Ver historial completo</button>
+                    </div>
+                    <div id="eventFiltersSummary" class="filter-summary">Sin filtros aplicados.</div>
+                    <div class="table-wrap">
+                        <table class="business-table">
+                            <thead><tr><th>Fecha</th><th>Acción</th><th>Origen</th><th>Entidad</th><th>Descripción</th></tr></thead>
+                            <tbody id="eventsTableBody"><tr><td colspan="5">Selecciona filtros o consulta el historial para mostrar la trazabilidad del sistema.</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="event-subview" data-event-subview="recent">
+                    <h3>Actividad reciente</h3>
+                    <p class="section-description">Consulta los eventos más recientes registrados por el sistema.</p>
+                    <div class="latest-events-control">
+                        <label for="latestEventsLimit">Cantidad de eventos recientes</label>
+                        <input type="number" id="latestEventsLimit" value="5" placeholder="Límite">
+                        <button type="button" class="btn btn-primary" data-request="events-latest">Ver actividad reciente</button>
+                        <button type="button" id="clearRecentEventsBtn" class="btn btn-secondary">Limpiar actividad reciente</button>
+                    </div>
+                    <p id="recentEventsMessage" class="recent-events-note">Selecciona cuántos eventos recientes deseas revisar.</p>
+                    <div class="table-wrap">
+                        <table class="business-table">
+                            <thead><tr><th>Fecha</th><th>Acción</th><th>Origen</th><th>Entidad</th><th>Descripción</th></tr></thead>
+                            <tbody id="latestEventsTableBody"><tr><td colspan="5">Selecciona cuántos eventos recientes deseas revisar.</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <section id="estadisticas" class="demo-section app-view" data-view="stats" aria-labelledby="statsDemoTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Estabilidad del release</p>
+                        <h2 id="statsDemoTitle">📈 Estadísticas</h2>
+                        <p class="section-description">
+                            Comprueba los conteos <code>create</code>, <code>update</code>,
+                            <code>delete</code>, <code>query</code> y <code>total</code>.
+                        </p>
+                    </div>
+                </div>
+                <div class="stats-card-grid">
+                    <article class="metric-card"><span>CREATE</span><strong id="statCreate">0</strong></article>
+                    <article class="metric-card"><span>UPDATE</span><strong id="statUpdate">0</strong></article>
+                    <article class="metric-card"><span>DELETE</span><strong id="statDelete">0</strong></article>
+                    <article class="metric-card"><span>QUERY</span><strong id="statQuery">0</strong></article>
+                    <article class="metric-card total-metric"><span>TOTAL</span><strong id="statTotal">0</strong></article>
+                </div>
+                <div id="statsBars" class="stats-bars"></div>
+                <button type="button" class="btn btn-primary compact-action" data-request="events-stats">Actualizar estadísticas</button>
+                <p id="statsMessage" class="business-message">El total corresponde a la suma de las acciones registradas.</p>
+            </section>
+
+            <section id="evidencia-release" class="demo-section evidence-section app-view" data-view="evidence" aria-labelledby="evidenceTitle">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Trazabilidad del sprint</p>
+                        <h2 id="evidenceTitle">🧪 Evidencia del release v1.2.0</h2>
+                        <p class="section-description">
+                            Guía de funcionalidades demostradas durante el video, relacionando cada ticket con la vista donde se evidencia su funcionamiento.
+                        </p>
+                    </div>
+                </div>
+                <div class="table-wrap">
+                    <table class="business-table release-table">
+                        <thead>
+                            <tr>
+                                <th>Versión</th>
+                                <th>Ticket</th>
+                                <th>Tipo</th>
+                                <th>Funcionalidad demostrada</th>
+                                <th>Vista de la demo</th>
+                                <th>Evidencia funcional</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>v1.1.1</td><td>#40</td><td><span class="ticket-type feature">Feature</span></td>
+                                <td>Filtros avanzados de eventos</td><td><span class="view-badge">Eventos</span></td>
+                                <td>Se filtra la trazabilidad por tipo de acción, origen y entidad afectada, mostrando únicamente los eventos que cumplen todos los filtros seleccionados.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.2</td><td>#41</td><td><span class="ticket-type bug">Bug</span></td>
+                                <td>Validación de productos</td><td><span class="view-badge">Productos / Crear producto</span></td>
+                                <td>El formulario de creación muestra validaciones de negocio y el backend rechaza datos incompletos o inválidos sin modificar el inventario.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.3</td><td>#42</td><td><span class="ticket-type technical-debt">Technical Debt</span></td>
+                                <td>Servicio dedicado de validación de productos</td><td><span class="view-badge">Productos / Crear producto</span></td>
+                                <td>La creación y validación de productos se mantiene estable después del refactor, conservando las reglas de validación sin regresiones visibles.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.4</td><td>#43</td><td><span class="ticket-type feature">Feature</span></td>
+                                <td>Últimos eventos registrados</td><td><span class="view-badge">Eventos</span></td>
+                                <td>La sección de actividad reciente muestra los eventos más nuevos primero, respetando la cantidad indicada por el usuario.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.5</td><td>#44</td><td><span class="ticket-type bug">Bug</span></td>
+                                <td>Manejo de producto inexistente</td><td><span class="view-badge">Productos / Consulta individual</span></td>
+                                <td>Al buscar un ID inexistente, el sistema muestra un mensaje funcional de producto no encontrado sin modificar el inventario.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.6</td><td>#45</td><td><span class="ticket-type technical-debt">Technical Debt</span></td>
+                                <td>Mejora de nombres internos en EventsService</td><td><span class="view-badge">Eventos</span></td>
+                                <td>La trazabilidad de eventos se conserva estable después del refactor, sin cambios visibles en filtros, historial ni actividad reciente.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.7</td><td>#46</td><td><span class="ticket-type feature">Feature</span></td>
+                                <td>Búsqueda de productos por nombre y categoría</td><td><span class="view-badge">Búsqueda</span></td>
+                                <td>El usuario puede buscar productos por nombre, seleccionar una categoría y combinar ambos criterios para filtrar el catálogo.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.8</td><td>#47</td><td><span class="ticket-type bug">Bug</span></td>
+                                <td>Validación de eventos inválidos</td><td><span class="view-badge">Evidencia del release / pruebas automatizadas</span></td>
+                                <td>El backend mantiene una protección contra eventos incompletos o con acciones no permitidas. No se muestra como botón principal para no interrumpir el flujo de negocio, pero queda documentado como garantía técnica del release.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.9</td><td>#48</td><td><span class="ticket-type technical-debt">Technical Debt</span></td>
+                                <td>Servicio especializado de estadísticas</td><td><span class="view-badge">Estadísticas</span></td>
+                                <td>La vista de estadísticas muestra los conteos de eventos mediante indicadores y barras, manteniendo el contrato público después de separar la lógica en un servicio especializado.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.10</td><td>#49</td><td><span class="ticket-type feature">Feature</span></td>
+                                <td>Resumen de productos activos</td><td><span class="view-badge">Inventario / Dashboard</span></td>
+                                <td>El sistema presenta indicadores de negocio como productos activos, cantidad total y valor total del inventario.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.11</td><td>#50</td><td><span class="ticket-type bug">Bug</span></td>
+                                <td>Estadísticas estables con repositorios vacíos o parciales</td><td><span class="view-badge">Estadísticas</span></td>
+                                <td>Los conteos se muestran siempre como valores numéricos y el total corresponde a la suma de las acciones, evitando valores nulos, indefinidos o NaN.</td>
+                            </tr>
+                            <tr>
+                                <td>v1.1.12</td><td>#51</td><td><span class="ticket-type technical-debt">Technical Debt</span></td>
+                                <td>Estrategia de pruebas del monorepo</td><td><span class="view-badge">Evidencia del release / documentación</span></td>
+                                <td>La documentación permite reproducir validaciones de ambas aplicaciones, incluyendo formato, lint, typecheck, build, pruebas unitarias, e2e y cobertura mínima del 80%.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <section class="release-summary" aria-labelledby="releaseSummaryTitle">
+                    <div>
+                        <p class="eyebrow">Integración final</p>
+                        <h3 id="releaseSummaryTitle">Resumen del release</h3>
+                    </div>
+                    <div class="release-summary-grid">
+                        <article><strong>12</strong><span>tickets principales completados</span></article>
+                        <article><strong>v1.1.1 → v1.1.12</strong><span>tags generados</span></article>
+                        <article><strong>v1.2.0</strong><span>release consolidado esperado</span></article>
+                        <article><strong>develop</strong><span>ramas integradas</span></article>
+                        <article><strong>main</strong><span>promoción final</span></article>
+                    </div>
+                    <p>
+                        Los tickets v1.1.1 a v1.1.12 representan incrementos micro integrados en develop. El release oficial v1.2.0 consolida todas las mejoras y se promociona a main mediante Pull Request final.
+                    </p>
+                </section>
+                <details class="technical-details">
+                    <summary>Detalle técnico de la última operación</summary>
+                    <div class="response-console" aria-live="polite">
+                    <div class="response-console-header">
+                        <div>
+                            <span class="console-label">Prueba</span>
+                            <strong id="responseTestName">Ninguna prueba seleccionada</strong>
+                            <span class="console-label">URL consultada</span>
+                            <code id="responseUrl">Ninguna consulta ejecutada</code>
+                        </div>
+                        <span id="responseStatus" class="http-status idle">Sin ejecutar</span>
+                    </div>
+                    <p id="responseError" class="response-error"></p>
+                    <pre id="responseJson">Selecciona una funcionalidad para comenzar la demostración.</pre>
+                    </div>
+                </details>
+            </section>
+
+            <section class="product-tabs-shell app-view" data-view="products" aria-label="Navegación interna de Productos">
+                <div class="product-tabs">
+                    <button type="button" class="product-tab active" data-product-view="inventory">Inventario</button>
+                    <button type="button" class="product-tab" data-product-view="create">Crear producto</button>
+                    <button type="button" class="product-tab" data-product-view="lookup">Consulta individual</button>
+                </div>
+            </section>
+
             <!-- Formulario -->
-            <section class="form-section">
+            <section id="crear-producto" class="form-section app-view product-subview" data-view="products" data-product-subview="create">
                 <h2>➕ Crear Nuevo Producto</h2>
                 <form id="productForm" class="form">
                     <div class="form-group">
@@ -52,7 +427,7 @@
 
                         <div class="form-group">
                             <label for="quantity">Cantidad *</label>
-                            <input type="number" id="quantity" name="quantity" required min="1" placeholder="Ej: 50">
+                            <input type="number" id="quantity" name="quantity" required min="0" placeholder="Ej: 50">
                         </div>
                     </div>
 
@@ -74,20 +449,43 @@
                 </form>
 
                 <div id="message" class="message"></div>
+                <div id="createProductFollowup" class="create-followup" hidden>
+                    <span>Puedes revisar el producto creado en la pestaña Inventario.</span>
+                    <button id="goToInventoryBtn" type="button" class="btn btn-secondary">Ir a Inventario</button>
+                </div>
             </section>
 
             <!-- Lista de Productos -->
-            <section class="products-section">
+            <section id="lista-productos" class="products-section app-view product-subview active-subview" data-view="products" data-product-subview="inventory">
                 <div class="products-header">
                     <h2>📦 Productos en Inventario</h2>
                     <div class="header-controls">
                         <input type="text" id="searchInput" class="search-box" placeholder="🔍 Buscar producto...">
-                        <button id="refreshBtn" class="btn btn-secondary">🔄 Actualizar</button>
+                        <button id="refreshBtn" class="btn btn-secondary">Actualizar inventario</button>
                     </div>
                 </div>
 
                 <div id="loadingSpinner" class="spinner"></div>
                 <div id="productList" class="product-grid"></div>
+            </section>
+
+            <section id="consulta-producto" class="demo-section app-view product-subview" data-view="products" data-product-subview="lookup">
+                <div class="section-heading">
+                    <div>
+                        <p class="eyebrow">Consulta individual</p>
+                        <h2>🔎 Consulta de producto</h2>
+                        <p class="section-description">Busca un producto por su identificador sin modificar el inventario.</p>
+                    </div>
+                </div>
+                <div class="product-lookup-control">
+                    <label for="missingProductId">ID del producto</label>
+                    <input type="number" id="missingProductId" value="999999" min="1" placeholder="ID del producto">
+                    <button type="button" class="btn btn-primary" data-request="product-not-found">Buscar producto</button>
+                </div>
+                <div id="productLookupResult" class="business-result">
+                    Ingresa un ID para consultar el producto.
+                </div>
+                <small class="business-evidence">Evidencia técnica: consulta realizada sobre el servicio de productos.</small>
             </section>
         </main>
 
@@ -143,10 +541,32 @@
             </div>
         </div>
 
+        <!-- Modal de confirmación de eliminación -->
+        <div
+            id="deleteModal"
+            class="modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="deleteModalTitle"
+            aria-describedby="deleteModalDescription"
+        >
+            <div class="modal-content delete-modal-content">
+                <h2 id="deleteModalTitle">Confirmar eliminación</h2>
+                <p id="deleteModalMessage" class="delete-modal-message"></p>
+                <p id="deleteModalDescription" class="delete-modal-description">
+                    Esta acción realizará una eliminación lógica y el producto dejará de mostrarse en el inventario activo.
+                </p>
+                <div class="modal-buttons delete-modal-buttons">
+                    <button type="button" class="btn btn-secondary" id="cancelDeleteBtn">Cancelar</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Eliminar producto</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Footer -->
         <footer class="footer">
             <p>🎓 Taller de Mantenimiento de Software - EPN Event Manager</p>
-            <p>Eventos enviados automáticamente a: http://localhost:3000/events</p>
+            <p>Eventos enviados automáticamente a: http://localhost:3002/events</p>
         </footer>
     </div>
 

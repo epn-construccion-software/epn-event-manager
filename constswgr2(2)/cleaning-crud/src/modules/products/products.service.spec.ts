@@ -8,6 +8,7 @@ import { EventEmitterService } from '../../services/event-emitter.service';
 import { LoggerService } from '../../services/logger.service';
 import { ProductEntity } from './product.entity';
 import { ProductsService } from './products.service';
+import { ProductValidationService } from './product-validation.service';
 
 type MockProductRepository = {
   create: jest.MockedFunction<
@@ -53,6 +54,7 @@ describe('ProductsService', () => {
     >;
   };
   let logger: jest.Mocked<Pick<LoggerService, 'info' | 'error' | 'warn'>>;
+  let productValidation: ProductValidationService;
 
   beforeEach(() => {
     repo = {
@@ -71,8 +73,12 @@ describe('ProductsService', () => {
       >(async () => undefined),
     };
     logger = { info: jest.fn(), error: jest.fn(), warn: jest.fn() };
+    productValidation = new ProductValidationService(
+      repo as unknown as Repository<ProductEntity>,
+    );
     service = new ProductsService(
       repo as unknown as Repository<ProductEntity>,
+      productValidation,
       eventEmitter as unknown as EventEmitterService,
       logger as unknown as LoggerService,
     );
@@ -84,6 +90,11 @@ describe('ProductsService', () => {
   });
 
   it('creates a product, trims values, logs and emits an event', async () => {
+    const validateCreate = jest.spyOn(productValidation, 'validateCreate');
+    const validateDuplicate = jest.spyOn(
+      productValidation,
+      'validateCreateDuplicateId',
+    );
     const product = await service.create({
       name: '  Cloro  ',
       category: '  Desinfectantes  ',
@@ -100,6 +111,8 @@ describe('ProductsService', () => {
       description: 'Botella',
     });
     expect(product.name).toBe('Cloro');
+    expect(validateCreate).toHaveBeenCalledTimes(1);
+    expect(validateDuplicate).toHaveBeenCalledTimes(1);
     expect(logger.info).toHaveBeenCalledWith(
       'Producto creado',
       expect.objectContaining({ action: 'CREATE', productId: 1 }),
@@ -195,6 +208,83 @@ describe('ProductsService', () => {
     );
   });
 
+  it('filters products by partial name ignoring case and spaces', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro Concentrado',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Jabón Líquido',
+        category: 'Higiene',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'CLORO Gel',
+        category: 'Desinfectantes',
+      }),
+    ]);
+
+    const products = await service.findAll({ name: '  cloro  ' });
+
+    expect(products.map(product => product.id)).toEqual([1, 3]);
+  });
+
+  it('filters products by normalized category using exact matching', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Alcohol',
+        category: 'desinfectantes',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'Limpiador',
+        category: 'Desinfectantes industriales',
+      }),
+    ]);
+
+    const products = await service.findAll({
+      category: '  DESINFECTANTES  ',
+    });
+
+    expect(products.map(product => product.id)).toEqual([1, 2]);
+  });
+
+  it('combines name and category filters using AND', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro Gel',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Cloro Perfumado',
+        category: 'Aromatizantes',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'Jabón',
+        category: 'Desinfectantes',
+      }),
+    ]);
+
+    const products = await service.findAll({
+      name: 'cloro',
+      category: 'desinfectantes',
+    });
+
+    expect(products.map(product => product.id)).toEqual([1]);
+  });
+
   it('wraps repository errors while listing', async () => {
     repo.find.mockRejectedValue(new Error('find failed'));
 
@@ -238,6 +328,7 @@ describe('ProductsService', () => {
   });
 
   it('updates a product and records previous values in the event payload', async () => {
+    const validateUpdate = jest.spyOn(productValidation, 'validateUpdate');
     repo.findOne.mockResolvedValue(makeProductEntity({ id: 2, name: 'Viejo' }));
 
     const updated = await service.update(2, {
@@ -249,6 +340,7 @@ describe('ProductsService', () => {
     });
 
     expect(updated.name).toBe('Nuevo');
+    expect(validateUpdate).toHaveBeenCalledTimes(1);
     expect(repo.save).toHaveBeenCalledWith(
       expect.objectContaining({
         name: 'Nuevo',
@@ -290,6 +382,16 @@ describe('ProductsService', () => {
     );
   });
 
+  it('throws NotFoundException when updating a logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 6, deleted: true }));
+
+    await expect(service.update(6, { price: 10 })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   it('wraps unexpected update errors', async () => {
     repo.findOne.mockResolvedValue(makeProductEntity());
     repo.save.mockRejectedValue(new Error('save failed'));
@@ -324,6 +426,15 @@ describe('ProductsService', () => {
 
   it('throws NotFoundException when removing a missing product', async () => {
     await expect(service.remove(404)).rejects.toThrow(NotFoundException);
+  });
+
+  it('throws NotFoundException when removing an already logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 7, deleted: true }));
+
+    await expect(service.remove(7)).rejects.toThrow(NotFoundException);
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.remove).not.toHaveBeenCalled();
   });
 
   it('wraps unexpected remove errors', async () => {
@@ -381,6 +492,73 @@ describe('ProductsService', () => {
 
     await expect(service.getStats()).rejects.toThrow(
       InternalServerErrorException,
+    );
+  });
+
+  it('calculates the active products summary', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5 }),
+      makeProductEntity({ id: 2, quantity: 3, price: 10 }),
+    ]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 2,
+      totalQuantity: 5,
+      totalInventoryValue: 40,
+    });
+  });
+
+  it('excludes logically deleted products from the active summary', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5, deleted: false }),
+      makeProductEntity({ id: 2, quantity: 100, price: 100, deleted: true }),
+    ]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 1,
+      totalQuantity: 2,
+      totalInventoryValue: 10,
+    });
+  });
+
+  it('returns zeros when there are no products', async () => {
+    repo.find.mockResolvedValue([]);
+
+    const summary = await service.getActiveSummary();
+
+    expect(summary).toMatchObject({
+      activeProducts: 0,
+      totalQuantity: 0,
+      totalInventoryValue: 0,
+    });
+  });
+
+  it('does not alter /products/stats behaviour', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({ id: 1, quantity: 2, price: 5 }),
+    ]);
+
+    const stats = await service.getStats();
+    const summary = await service.getActiveSummary();
+
+    expect(stats.totalProducts).toBe(1);
+    expect(summary.activeProducts).toBe(1);
+  });
+
+  it('wraps unexpected active summary errors', async () => {
+    repo.find.mockRejectedValue(new Error('summary failed'));
+
+    await expect(service.getActiveSummary()).rejects.toThrow(
+      InternalServerErrorException,
+    );
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error en getActiveSummary',
+      expect.objectContaining({ error: 'summary failed' }),
     );
   });
 });

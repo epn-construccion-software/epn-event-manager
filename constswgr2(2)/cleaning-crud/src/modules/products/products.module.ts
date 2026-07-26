@@ -5,10 +5,16 @@ import { ProductsController } from './products.controller';
 import { EventEmitterService } from '../../services/event-emitter.service';
 import { LoggerService } from '../../services/logger.service';
 import { ProductEntity } from './product.entity';
+import { ProductValidationService } from './product-validation.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([ProductEntity])],
   controllers: [ProductsController],
-  providers: [ProductsService, EventEmitterService, LoggerService],
+  providers: [
+    ProductsService,
+    ProductValidationService,
+    EventEmitterService,
+    LoggerService,
+  ],
 })
 export class ProductsModule {}

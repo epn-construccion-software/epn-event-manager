@@ -164,6 +164,120 @@ describe('Products API (e2e)', () => {
       .expect(200);
   });
 
+  // ── Búsqueda por nombre y categoría ──────────────────────────────────────
+
+  describe('GET /products con filtros', () => {
+    let matchingId: number;
+    let sameNameId: number;
+    let sameCategoryId: number;
+
+    beforeAll(async () => {
+      const matchingResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Cloro',
+          category: 'CategoriaJosue',
+          quantity: 3,
+          price: 2,
+        })
+        .expect(201);
+      matchingId = (matchingResponse.body as { id: number }).id;
+
+      const sameNameResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Gel',
+          category: 'OtraCategoria',
+          quantity: 4,
+          price: 3,
+        })
+        .expect(201);
+      sameNameId = (sameNameResponse.body as { id: number }).id;
+
+      const sameCategoryResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'Producto Distinto',
+          category: 'CategoriaJosue',
+          quantity: 5,
+          price: 4,
+        })
+        .expect(201);
+      sameCategoryId = (sameCategoryResponse.body as { id: number }).id;
+    });
+
+    afterAll(async () => {
+      for (const id of [sameNameId, sameCategoryId]) {
+        if (id) {
+          await request(app.getHttpServer())
+            .delete(`/products/${id}`)
+            .set('X-FIS-EPN-KEY', API_KEY);
+        }
+      }
+    });
+
+    it('busca parcialmente por nombre ignorando mayúsculas y espacios', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: '  FILTROJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameNameId]));
+      expect(ids).not.toContain(sameCategoryId);
+    });
+
+    it('busca por categoría normalizada usando coincidencia exacta', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ category: '  CATEGORIAJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameCategoryId]));
+      expect(ids).not.toContain(sameNameId);
+    });
+
+    it('combina los filtros name y category usando AND', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({
+          name: 'filtrojosue',
+          category: 'categoriajosue',
+        })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        expect.objectContaining({ id: matchingId }),
+      ]);
+    });
+
+    it('excluye de la búsqueda los productos eliminados', async () => {
+      await request(app.getHttpServer())
+        .delete(`/products/${matchingId}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: 'FiltroJosue Cloro' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+  });
+
   // ── Errores 404 ───────────────────────────────────────────────────────────
 
   it('GET /products/:id después de eliminar debe responder 404', () => {
@@ -195,6 +309,79 @@ describe('Products API (e2e)', () => {
       .expect(404);
   });
 
+  it.each([
+    ['GET', '/products/999999'],
+    ['PATCH', '/products/999999'],
+    ['DELETE', '/products/999999'],
+  ])(
+    '%s /products/999999 responde 404 con los cinco campos acordados',
+    async (method, url) => {
+      const httpMethod = method.toLowerCase() as 'get' | 'patch' | 'delete';
+      const agent = request(app.getHttpServer());
+      const response = await agent[httpMethod](url)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(404);
+
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          statusCode: 404,
+          error: expect.any(String),
+          message: expect.stringContaining('999999'),
+          timestamp: expect.any(String),
+          path: '/products/999999',
+        }),
+      );
+    },
+  );
+
+  it('PATCH y DELETE sobre un producto ya eliminado responden 404 sin modificarlo', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto Fantasma',
+        category: 'Pruebas',
+        quantity: 1,
+        price: 1,
+      })
+      .expect(201);
+    const ghostId = (createResponse.body as { id: number }).id;
+
+    await request(app.getHttpServer())
+      .delete(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const patchAfterDelete = await request(app.getHttpServer())
+      .patch(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({ price: 999 })
+      .expect(404);
+    expect(patchAfterDelete.body).toEqual(
+      expect.objectContaining({
+        statusCode: 404,
+        error: expect.any(String),
+        message: expect.any(String),
+        timestamp: expect.any(String),
+        path: `/products/${ghostId}`,
+      }),
+    );
+
+    const deleteAgain = await request(app.getHttpServer())
+      .delete(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(404);
+    expect(deleteAgain.body).toEqual(
+      expect.objectContaining({
+        statusCode: 404,
+        error: expect.any(String),
+        message: expect.any(String),
+        timestamp: expect.any(String),
+        path: `/products/${ghostId}`,
+      }),
+    );
+  });
+
   // ── Errores 400 ───────────────────────────────────────────────────────────
 
   it('GET /products/abc debe responder 400 por ID no numérico', () => {
@@ -204,6 +391,19 @@ describe('Products API (e2e)', () => {
       .expect(400);
   });
 
+  it.each([
+    ['GET', '/products/abc'],
+    ['PATCH', '/products/abc'],
+    ['DELETE', '/products/abc'],
+  ])(
+    '%s /products/abc responde 400 por ID con formato inválido',
+    (method, url) => {
+      const httpMethod = method.toLowerCase() as 'get' | 'patch' | 'delete';
+      const agent = request(app.getHttpServer());
+      return agent[httpMethod](url).set('X-FIS-EPN-KEY', API_KEY).expect(400);
+    },
+  );
+
   it('POST /products sin campos requeridos debe responder 400', () => {
     return request(app.getHttpServer())
       .post('/products')
@@ -211,6 +411,47 @@ describe('Products API (e2e)', () => {
       .send({ quantity: 5 })
       .expect(400);
   });
+
+  it.each([
+    ['name ausente', { category: 'Cat', quantity: 1, price: 1 }],
+    ['category ausente', { name: 'Test', quantity: 1, price: 1 }],
+    ['name vacío', { name: '', category: 'Cat', quantity: 1, price: 1 }],
+    [
+      'category con espacios',
+      { name: 'Test', category: '   ', quantity: 1, price: 1 },
+    ],
+    ['quantity ausente', { name: 'Test', category: 'Cat', price: 1 }],
+    [
+      'quantity no numérico',
+      { name: 'Test', category: 'Cat', quantity: 'uno', price: 1 },
+    ],
+    ['price ausente', { name: 'Test', category: 'Cat', quantity: 1 }],
+    [
+      'price no numérico',
+      { name: 'Test', category: 'Cat', quantity: 1, price: 'uno' },
+    ],
+  ])(
+    'POST /products con %s debe responder 400 sin persistir',
+    async (_case, payload) => {
+      const beforeResponse = await request(app.getHttpServer())
+        .get('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      const countBefore = (beforeResponse.body as unknown[]).length;
+
+      await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send(payload)
+        .expect(400);
+
+      const afterResponse = await request(app.getHttpServer())
+        .get('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      expect(afterResponse.body as unknown[]).toHaveLength(countBefore);
+    },
+  );
 
   it('POST /products con campo no permitido debe responder 400', () => {
     return request(app.getHttpServer())
@@ -263,6 +504,93 @@ describe('Products API (e2e)', () => {
       .expect(400);
   });
 
+  it.each([
+    ['name vacío', { name: '' }],
+    ['category con espacios', { category: '   ' }],
+  ])(
+    'PATCH /products/:id con %s debe responder 400 sin modificar datos',
+    async (_case, payload) => {
+      const createResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'Producto para validar PATCH',
+          category: 'Pruebas',
+          quantity: 2,
+          price: 4,
+        })
+        .expect(201);
+      const product = createResponse.body as {
+        id: number;
+        name: string;
+        category: string;
+      };
+
+      await request(app.getHttpServer())
+        .patch(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send(payload)
+        .expect(400);
+
+      const afterResponse = await request(app.getHttpServer())
+        .get(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+      const productAfter = afterResponse.body as {
+        name: string;
+        category: string;
+      };
+      expect(productAfter.name).toBe(product.name);
+      expect(productAfter.category).toBe(product.category);
+
+      await request(app.getHttpServer())
+        .delete(`/products/${product.id}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+    },
+  );
+
+  it('PATCH /products/:id parcial con solo price debe seguir siendo válido', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto parcial',
+        category: 'Pruebas',
+        quantity: 2,
+        price: 4,
+      })
+      .expect(201);
+    const product = createResponse.body as {
+      id: number;
+      name: string;
+      category: string;
+      quantity: number;
+    };
+
+    const updateResponse = await request(app.getHttpServer())
+      .patch(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({ price: 7.5 })
+      .expect(200);
+    const updated = updateResponse.body as {
+      name: string;
+      category: string;
+      quantity: number;
+      price: number | string;
+    };
+
+    expect(updated.name).toBe(product.name);
+    expect(updated.category).toBe(product.category);
+    expect(updated.quantity).toBe(product.quantity);
+    expect(Number(updated.price)).toBe(7.5);
+
+    await request(app.getHttpServer())
+      .delete(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+  });
+
   // ── Estadísticas ─────────────────────────────────────────────────────────
 
   it('GET /products/stats debe retornar estadísticas', async () => {
@@ -287,5 +615,114 @@ describe('Products API (e2e)', () => {
         expect(res.body.totalInventoryValue).toBeDefined();
         expect(res.body.productsByCategory).toBeDefined();
       });
+  });
+
+  // ── Resumen de productos activos ────────────────────────────────────────
+
+  it('GET /products/active-summary sin API key debe responder 401', () => {
+    return request(app.getHttpServer())
+      .get('/products/active-summary')
+      .expect(401);
+  });
+
+  it('GET /products/active-summary debe retornar exactamente los tres campos esperados', () => {
+    return request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200)
+      .expect((res: SupertestResponse) => {
+        expect(
+          Object.keys(res.body).sort((a, b) => a.localeCompare(b)),
+        ).toEqual(
+          ['activeProducts', 'totalQuantity', 'totalInventoryValue'].sort(
+            (a, b) => a.localeCompare(b),
+          ),
+        );
+        expect(typeof res.body.activeProducts).toBe('number');
+        expect(typeof res.body.totalQuantity).toBe('number');
+        expect(typeof res.body.totalInventoryValue).toBe('number');
+      });
+  });
+
+  it('GET /products/active-summary debe sumar price * quantity de productos activos y excluir los eliminados', async () => {
+    const beforeResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+    const baseline = beforeResponse.body as {
+      activeProducts: number;
+      totalQuantity: number;
+      totalInventoryValue: number;
+    };
+
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto Resumen Activo',
+        category: 'Pruebas',
+        quantity: 4,
+        price: 3.5,
+      })
+      .expect(201);
+    const product = createResponse.body as { id: number };
+
+    const afterCreateResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+    const afterCreate = afterCreateResponse.body as {
+      activeProducts: number;
+      totalQuantity: number;
+      totalInventoryValue: number;
+    };
+
+    // Cálculo manual: 4 unidades * 3.5 = 14 agregados al inventario activo
+    expect(afterCreate.activeProducts).toBe(baseline.activeProducts + 1);
+    expect(afterCreate.totalQuantity).toBe(baseline.totalQuantity + 4);
+    expect(afterCreate.totalInventoryValue).toBeCloseTo(
+      baseline.totalInventoryValue + 14,
+      2,
+    );
+
+    await request(app.getHttpServer())
+      .delete(`/products/${product.id}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const afterDeleteResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    // El producto eliminado (lógicamente) ya no debe contarse
+    expect(afterDeleteResponse.body).toMatchObject(baseline);
+  });
+
+  it('GET /products/active-summary no debe alterar /products/stats ni el listado existente', async () => {
+    const summaryResponse = await request(app.getHttpServer())
+      .get('/products/active-summary')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const statsResponse = await request(app.getHttpServer())
+      .get('/products/stats')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const listResponse = await request(app.getHttpServer())
+      .get('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    expect(summaryResponse.body.activeProducts).toBe(
+      statsResponse.body.totalProducts,
+    );
+    expect(summaryResponse.body.totalQuantity).toBe(
+      statsResponse.body.totalQuantity,
+    );
+    expect(summaryResponse.body.activeProducts).toBe(
+      (listResponse.body as unknown[]).length,
+    );
   });
 });

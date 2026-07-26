@@ -6,6 +6,7 @@ import { CreateEventEntity } from '../../database/entities/create-event.entity';
 import { UpdateEventEntity } from '../../database/entities/update-event.entity';
 import { DeleteEventEntity } from '../../database/entities/delete-event.entity';
 import { QueryEventEntity } from '../../database/entities/query-event.entity';
+import { EventFiltersDto } from './dto/event-filters.dto';
 
 type RepositoryMock<T extends object> = {
   create: jest.Mock<T, [Partial<T>]>;
@@ -223,6 +224,72 @@ describe('EventsService', () => {
     ]);
   });
 
+  describe('findAll filters', () => {
+    beforeEach(() => {
+      createRepo.findBy.mockResolvedValue([
+        {
+          action: 'CREATE',
+          source: 'cleaning-crud',
+          entity: 'product',
+          recorded_at: '2026-07-07 10:00:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.findBy.mockResolvedValue([]);
+      deleteRepo.findBy.mockResolvedValue([]);
+      queryRepo.findBy.mockResolvedValue([]);
+    });
+
+    it.each([
+      ['action', { action: 'CREATE' }],
+      ['source', { source: 'cleaning-crud' }],
+      ['entity', { entity: 'product' }],
+    ] as const)('should filter events by %s', async (_name, filters) => {
+      const result = await service.findAll(filters);
+
+      expect(result).toHaveLength(1);
+      expect(createRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(updateRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(deleteRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(queryRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(createRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('should apply combined filters with AND criteria', async () => {
+      const filters: EventFiltersDto = {
+        action: 'CREATE',
+        source: 'cleaning-crud',
+        entity: 'product',
+      };
+
+      const result = await service.findAll(filters);
+
+      expect(result).toHaveLength(1);
+      expect(createRepo.findBy).toHaveBeenCalledWith(filters);
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          action: 'CREATE',
+          source: 'cleaning-crud',
+          entity: 'product',
+          _table: 'create_events',
+        }),
+      );
+    });
+
+    it.each([
+      [{ action: 'ARCHIVE' }, 'action'],
+      [{ source: '' }, 'source'],
+      [{ entity: '   ' }, 'entity'],
+      [{ status: 'active' }, 'status'],
+    ])('should reject invalid filters %o', async (filters, message) => {
+      await expect(
+        service.findAll(filters as unknown as EventFiltersDto),
+      ).rejects.toThrow(message);
+
+      expect(createRepo.find).not.toHaveBeenCalled();
+      expect(createRepo.findBy).not.toHaveBeenCalled();
+    });
+  });
+
   it('should find events by source in all repositories', async () => {
     createRepo.findBy.mockResolvedValue([
       { source: 'cleaning-crud' } as CreateEventEntity,
@@ -269,20 +336,197 @@ describe('EventsService', () => {
     expect(queryRepo.findBy).toHaveBeenCalledWith({ entity: 'product' });
   });
 
-  it('should include QUERY events in stats total', async () => {
-    createRepo.count.mockResolvedValue(2);
-    updateRepo.count.mockResolvedValue(3);
-    deleteRepo.count.mockResolvedValue(1);
-    queryRepo.count.mockResolvedValue(4);
+  describe('findLatest', () => {
+    beforeEach(() => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 1,
+          source: 'cleaning-crud',
+          recorded_at: '2026-07-07 10:00:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 2,
+          source: 'cleaning-crud',
+          timestamp: '2026-07-07 12:00:00',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([
+        {
+          id: 3,
+          source: 'cleaning-crud',
+          createdAt: '2026-07-07 09:00:00',
+        } as DeleteEventEntity,
+      ]);
+      queryRepo.find.mockResolvedValue([
+        {
+          id: 4,
+          source: 'cleaning-crud',
+          event_date: '2026-07-07 11:00:00',
+        } as QueryEventEntity,
+      ]);
+    });
 
-    const result = await service.getStats();
+    it('returns events ordered from most to least recent', async () => {
+      const result = await service.findLatest();
 
-    expect(result).toEqual({
-      create: 2,
-      update: 3,
-      delete: 1,
-      query: 4,
-      total: 10,
+      expect(result).toEqual([
+        expect.objectContaining({ id: 2, _table: 'update_events' }),
+        expect.objectContaining({ id: 4, _table: 'query_events' }),
+        expect.objectContaining({ id: 1, _table: 'create_events' }),
+        expect.objectContaining({ id: 3, _table: 'delete_events' }),
+      ]);
+    });
+
+    it('applies the default limit when none is provided', async () => {
+      const result = await service.findLatest();
+
+      expect(result).toHaveLength(4);
+    });
+
+    it('limits the amount of returned events', async () => {
+      const result = await service.findLatest(2);
+
+      expect(result).toHaveLength(2);
+      expect(result).toEqual([
+        expect.objectContaining({ id: 2 }),
+        expect.objectContaining({ id: 4 }),
+      ]);
+    });
+
+    it('accepts limit as a numeric string coming from the query string', async () => {
+      const result = await service.findLatest('1');
+
+      expect(result).toEqual([expect.objectContaining({ id: 2 })]);
+    });
+
+    it('returns an empty array when every repository is empty', async () => {
+      createRepo.find.mockResolvedValue([]);
+      updateRepo.find.mockResolvedValue([]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result).toEqual([]);
+    });
+
+    it('treats missing or invalid dates as the oldest possible value', async () => {
+      createRepo.find.mockResolvedValue([
+        { id: 5, source: 'cleaning-crud' } as CreateEventEntity,
+      ]);
+
+      const result = await service.findLatest();
+
+      expect(result[result.length - 1]).toEqual(
+        expect.objectContaining({ id: 5 }),
+      );
+    });
+
+    it('orders localized day/month dates before applying the limit', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 14:43:00',
+        } as CreateEventEntity,
+        {
+          id: 6,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 11:45:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 7,
+          source: 'cleaning-crud',
+          timestamp: '26/07/2026, 14:42:00',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest(2);
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 5 }),
+        expect.objectContaining({ id: 7 }),
+      ]);
+    });
+
+    it('normalizes supported local date variants safely', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          recorded_at: '26/07/2026, 2:43:05 p. m.',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 6,
+          timestamp: '26-07-2026 12:05 a. m.',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([
+        {
+          id: 7,
+          createdAt: '2026-07-26T14:42:00.000Z',
+        } as DeleteEventEntity,
+      ]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 5 }),
+        expect.objectContaining({ id: 7 }),
+        expect.objectContaining({ id: 6 }),
+      ]);
+    });
+
+    it('places unsupported date variants at the end', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          recorded_at: '2026-07-26T14:43:00.000Z',
+        } as CreateEventEntity,
+        {} as CreateEventEntity,
+        { recorded_at: 123 } as unknown as CreateEventEntity,
+        { recorded_at: 'fecha desconocida' } as CreateEventEntity,
+        { recorded_at: '26/07/2026 sin-hora' } as CreateEventEntity,
+        { recorded_at: '26/07/2026 14:43 xyz' } as CreateEventEntity,
+        { recorded_at: '31/02/2026 14:43' } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result[0]).toEqual(expect.objectContaining({ id: 5 }));
+    });
+
+    it.each([
+      ['0', '0'],
+      ['-1', '-1'],
+      ['1.5', '1.5'],
+      ['abc', 'abc'],
+      ['101', '101'],
+    ])('rejects an invalid limit value %s', async (_name, value) => {
+      await expect(service.findLatest(value)).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(createRepo.find).not.toHaveBeenCalled();
+    });
+
+    it('rejects a limit that is not a string or number', async () => {
+      await expect(service.findLatest(['1', '2'])).rejects.toThrow(
+        BadRequestException,
+      );
+
+      expect(createRepo.find).not.toHaveBeenCalled();
     });
   });
 });

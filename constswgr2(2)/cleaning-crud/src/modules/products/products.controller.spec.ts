@@ -27,7 +27,13 @@ describe('ProductsController', () => {
   let productsService: jest.Mocked<
     Pick<
       ProductsService,
-      'create' | 'findAll' | 'findOne' | 'update' | 'remove' | 'getStats'
+      | 'create'
+      | 'findAll'
+      | 'findOne'
+      | 'update'
+      | 'remove'
+      | 'getStats'
+      | 'getActiveSummary'
     >
   >;
   let logger: jest.Mocked<Pick<LoggerService, 'info' | 'error' | 'warn'>>;
@@ -40,6 +46,7 @@ describe('ProductsController', () => {
       update: jest.fn(),
       remove: jest.fn(),
       getStats: jest.fn(),
+      getActiveSummary: jest.fn(),
     };
     logger = { info: jest.fn(), error: jest.fn(), warn: jest.fn() };
     controller = new ProductsController(
@@ -107,6 +114,18 @@ describe('ProductsController', () => {
     await expect(controller.findAll()).rejects.toThrow(HttpException);
   });
 
+  it('forwards name and category filters when listing products', async () => {
+    const filters = {
+      name: 'cloro',
+      category: 'desinfectantes',
+    };
+    productsService.findAll.mockResolvedValueOnce([makeProduct()]);
+
+    await expect(controller.findAll(filters)).resolves.toHaveLength(1);
+
+    expect(productsService.findAll).toHaveBeenCalledWith(filters);
+  });
+
   it('returns stats and converts stats errors to 500', async () => {
     productsService.getStats.mockResolvedValueOnce({
       totalProducts: 1,
@@ -123,6 +142,20 @@ describe('ProductsController', () => {
 
     productsService.getStats.mockRejectedValueOnce(new Error('boom'));
     await expect(controller.getStats()).rejects.toThrow(HttpException);
+  });
+
+  it('returns the active products summary and converts errors to 500', async () => {
+    productsService.getActiveSummary.mockResolvedValueOnce({
+      activeProducts: 2,
+      totalQuantity: 5,
+      totalInventoryValue: 40,
+    });
+    await expect(controller.getActiveSummary()).resolves.toMatchObject({
+      activeProducts: 2,
+    });
+
+    productsService.getActiveSummary.mockRejectedValueOnce(new Error('boom'));
+    await expect(controller.getActiveSummary()).rejects.toThrow(HttpException);
   });
 
   it('finds one product and validates numeric ids', async () => {
