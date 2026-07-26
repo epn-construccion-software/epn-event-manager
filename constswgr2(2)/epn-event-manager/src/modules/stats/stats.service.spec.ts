@@ -106,7 +106,7 @@ describe('StatsService', () => {
   it('normaliza a cero los conteos no numéricos en vez de propagar NaN', async () => {
     createEventsRepository.count.mockResolvedValue('abc' as unknown as number);
     updateEventsRepository.count.mockResolvedValue(5);
-    deleteEventsRepository.count.mockResolvedValue(NaN);
+    deleteEventsRepository.count.mockResolvedValue(Number.NaN);
     queryEventsRepository.count.mockResolvedValue(1);
 
     await expect(service.getStats()).resolves.toEqual({

@@ -66,7 +66,7 @@ describe('StatsController (e2e)', () => {
     ],
     [
       'normalizes null, undefined and non-numeric counts to zero instead of NaN',
-      [null, undefined, 'abc', NaN],
+      [null, undefined, 'abc', Number.NaN],
       { create: 0, update: 0, delete: 0, query: 0, total: 0 },
     ],
   ] as Array<[string, [unknown, unknown, unknown, unknown], object]>)(
