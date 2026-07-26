@@ -98,21 +98,56 @@ export class ProductsController {
       });
       return result;
     } catch (error) {
-      this.logger.error('Controlador: error en getStats', {
-        route: '/products/stats',
-        action: 'QUERY',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new HttpException(
-        {
-          statusCode: 500,
-          error: 'Internal Server Error',
-          message: 'Error interno en getStats',
-          timestamp: new Date().toISOString(),
-        },
-        500,
+      this.handleAggregationError(
+        error,
+        '/products/stats',
+        'Controlador: error en getStats',
+        'Error interno en getStats',
       );
     }
+  }
+
+  @Get('active-summary')
+  async getActiveSummary() {
+    try {
+      const result = await this.productsService.getActiveSummary();
+      this.logger.info('Controlador: resumen de productos activos generado', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+      });
+      return result;
+    } catch (error) {
+      this.handleAggregationError(
+        error,
+        '/products/active-summary',
+        'Controlador: error en getActiveSummary',
+        'Error interno en getActiveSummary',
+      );
+    }
+  }
+
+  // [PREVENTIVE] Shared by los endpoints de agregacion (stats/active-summary)
+  // para responder un 500 uniforme sin duplicar la construccion del error.
+  private handleAggregationError(
+    error: unknown,
+    route: string,
+    logMessage: string,
+    publicMessage: string,
+  ): never {
+    this.logger.error(logMessage, {
+      route,
+      action: 'QUERY',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    throw new HttpException(
+      {
+        statusCode: 500,
+        error: 'Internal Server Error',
+        message: publicMessage,
+        timestamp: new Date().toISOString(),
+      },
+      500,
+    );
   }
 
   @Get(':id')

@@ -33,6 +33,12 @@ type ProductsStats = {
   message: string;
 };
 
+type ActiveProductsSummary = {
+  activeProducts: number;
+  totalQuantity: number;
+  totalInventoryValue: number;
+};
+
 @Injectable()
 export class ProductsService {
   constructor(
@@ -256,10 +262,7 @@ export class ProductsService {
 
   async getStats(): Promise<ProductsStats> {
     try {
-      const allProducts = await this.productsRepository.find();
-
-      // [PREVENTIVE] Exclude logically deleted products from stats (consistent with findAll)
-      const products = this.filterDeletedProducts(allProducts);
+      const products = await this.fetchNonDeletedProducts();
       const stats = this.calculateProductsStats(products);
 
       this.logger.info('Estadísticas generadas', {
@@ -270,12 +273,10 @@ export class ProductsService {
 
       return stats;
     } catch (error) {
-      this.logger.error('Error en getStats', {
-        route: '/products/stats',
-        action: 'QUERY',
-        error: error instanceof Error ? error.message : String(error),
-      });
-      throw new InternalServerErrorException(
+      throw this.wrapAggregationError(
+        error,
+        '/products/stats',
+        'Error en getStats',
         'Error interno generando estadísticas',
       );
     }
@@ -294,6 +295,49 @@ export class ProductsService {
     }
 
     return product;
+  }
+
+  async getActiveSummary(): Promise<ActiveProductsSummary> {
+    try {
+      const products = await this.fetchNonDeletedProducts();
+      const summary = this.calculateActiveSummary(products);
+
+      this.logger.info('Resumen de productos activos generado', {
+        route: '/products/active-summary',
+        action: 'QUERY',
+        activeProducts: summary.activeProducts,
+      });
+
+      return summary;
+    } catch (error) {
+      throw this.wrapAggregationError(
+        error,
+        '/products/active-summary',
+        'Error en getActiveSummary',
+        'Error interno generando el resumen de productos activos',
+      );
+    }
+  }
+
+  // [PREVENTIVE] Shared by getStats/getActiveSummary so both aggregations
+  // consistently exclude logically deleted products (same rule as findAll).
+  private async fetchNonDeletedProducts(): Promise<ProductEntity[]> {
+    const allProducts = await this.productsRepository.find();
+    return this.filterDeletedProducts(allProducts);
+  }
+
+  private wrapAggregationError(
+    error: unknown,
+    route: string,
+    logMessage: string,
+    publicMessage: string,
+  ): InternalServerErrorException {
+    this.logger.error(logMessage, {
+      route,
+      action: 'QUERY',
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return new InternalServerErrorException(publicMessage);
   }
 
   private buildCreateProductEntity(dto: CreateProductDto): ProductEntity {
@@ -425,17 +469,8 @@ export class ProductsService {
 
   private calculateProductsStats(products: ProductEntity[]): ProductsStats {
     const totalProducts = products.length;
-
-    const totalQuantity = products.reduce(
-      (acc: number, product: ProductEntity) => acc + product.quantity,
-      0,
-    );
-
-    const totalInventoryValue = products.reduce(
-      (acc: number, product: ProductEntity) =>
-        acc + parseFloat(product.price.toString()) * product.quantity,
-      0,
-    );
+    const totalQuantity = this.sumQuantity(products);
+    const totalInventoryValue = this.sumInventoryValue(products);
 
     const averagePrice =
       totalQuantity > 0 ? totalInventoryValue / totalQuantity : 0;
@@ -459,6 +494,31 @@ export class ProductsService {
       }),
       message: 'Reporte estadístico generado correctamente',
     };
+  }
+
+  private calculateActiveSummary(
+    products: ProductEntity[],
+  ): ActiveProductsSummary {
+    return {
+      activeProducts: products.length,
+      totalQuantity: this.sumQuantity(products),
+      totalInventoryValue: this.sumInventoryValue(products),
+    };
+  }
+
+  private sumQuantity(products: ProductEntity[]): number {
+    return products.reduce(
+      (acc: number, product: ProductEntity) => acc + product.quantity,
+      0,
+    );
+  }
+
+  private sumInventoryValue(products: ProductEntity[]): number {
+    return products.reduce(
+      (acc: number, product: ProductEntity) =>
+        acc + parseFloat(product.price.toString()) * product.quantity,
+      0,
+    );
   }
 
   private getAdaptiveMetadata(): Record<string, string> {
