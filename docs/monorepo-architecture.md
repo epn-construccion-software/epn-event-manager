@@ -52,7 +52,8 @@ epn-event-manager/
 │   ├── definition-of-done.md
 │   ├── definition-of-ready.md
 │   ├── kanban-workflow.md
-│   └── monorepo-architecture.md
+│   ├── monorepo-architecture.md
+│   └── testing-strategy.md
 └── sonar-project.properties
 ```
 
