@@ -306,10 +306,12 @@ relaciona los doce incrementos del sprint con una evidencia observable:
 | v1.1.10 | #49 | Feature | Resumen de productos activos | Inventario / Dashboard | El sistema presenta indicadores de negocio como productos activos, cantidad total y valor total del inventario. |
 | v1.1.11 | #50 | Bug | Estadísticas estables con repositorios vacíos o parciales | Estadísticas | Los conteos se muestran siempre como valores numéricos y el total corresponde a la suma de las acciones, evitando valores nulos, indefinidos o NaN. |
 | v1.1.12 | #51 | Technical Debt | Estrategia de pruebas del monorepo | Evidencia del release / documentación | La documentación permite reproducir validaciones de ambas aplicaciones, incluyendo formato, lint, typecheck, build, pruebas unitarias, e2e y cobertura mínima del 80%. |
+| v1.2.0 | #66 | Task | Frontend para demostración funcional | Todas las vistas de la demo | La interfaz integra en un flujo funcional el Dashboard protegido, la gestión de productos, la trazabilidad de eventos, las estadísticas y la evidencia del release. |
+| v1.2.0 | #67 | Task | Documentación del release final | CHANGELOG / guía de demo | El release queda documentado mediante su resumen formal, issues, tags, validaciones, cobertura y secuencia reproducible de demostración. |
 
 ## Resumen del release
 
-- 12 tickets principales completados.
+- 12 tickets incrementales y 2 tareas finales de release completados.
 - Tags del ciclo: `v1.1.1` a `v1.1.12`.
 - Release consolidado esperado: `v1.2.0`.
 - Las ramas de los tickets se integran en `develop`.
@@ -318,6 +320,34 @@ relaciona los doce incrementos del sprint con una evidencia observable:
 Los tickets v1.1.1 a v1.1.12 representan incrementos micro integrados en
 `develop`. El release oficial v1.2.0 consolida todas las mejoras y se
 promociona a `main` mediante Pull Request final.
+
+## Validaciones y cobertura del release
+
+Las validaciones deben ejecutarse de forma independiente dentro de
+`constswgr2(2)/cleaning-crud` y
+`constswgr2(2)/epn-event-manager`:
+
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm run build
+npm run test:cov -- --runInBand
+npm run test:e2e
+```
+
+La fila `All files` de los reportes reales de Jest utilizados para validar el
+release presentó estos resultados:
+
+| Aplicación | Statements | Branches | Functions | Lines |
+| --- | ---: | ---: | ---: | ---: |
+| `cleaning-crud` | 99.5 % | 89.77 % | 97.46 % | 99.46 % |
+| `epn-event-manager` | 100 % | 87.5 % | 100 % | 100 % |
+| Frontend / demo | No aplica | No aplica | No aplica | No aplica |
+
+Ambas aplicaciones superan el mínimo requerido del 80 %. El frontend estático
+de la demostración no posee una suite independiente de cobertura, por lo que
+sus métricas se registran como **No aplica**.
 
 ## Observaciones y límites de la interfaz
 
