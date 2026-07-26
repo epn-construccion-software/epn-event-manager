@@ -35,10 +35,18 @@ export class StatsService {
       }),
     );
 
-    const createCount = await this.createEventsRepository.count();
-    const updateCount = await this.updateEventsRepository.count();
-    const deleteCount = await this.deleteEventsRepository.count();
-    const queryCount = await this.queryEventsRepository.count();
+    const createCount = this.normalizeCount(
+      await this.createEventsRepository.count(),
+    );
+    const updateCount = this.normalizeCount(
+      await this.updateEventsRepository.count(),
+    );
+    const deleteCount = this.normalizeCount(
+      await this.deleteEventsRepository.count(),
+    );
+    const queryCount = this.normalizeCount(
+      await this.queryEventsRepository.count(),
+    );
 
     return {
       create: createCount,
@@ -47,5 +55,12 @@ export class StatsService {
       query: queryCount,
       total: createCount + updateCount + deleteCount + queryCount,
     };
+  }
+
+  // Normaliza valores de count() que pueden venir null/undefined/no-numericos
+  // (p. ej. repositorios vacios o mocks) a un numero valido, evitando NaN.
+  private normalizeCount(value: unknown): number {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
   }
 }
