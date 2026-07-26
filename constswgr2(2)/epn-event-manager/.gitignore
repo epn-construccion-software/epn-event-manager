@@ -1,3 +1,18 @@
 node_modules/
 dist/
 .vscode/
+coverage/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# SQLite Database (No incluir en repositorio)
+db/
+*.sqlite
+*.sqlite3
+*.db
+
+# Logs
+*.log
