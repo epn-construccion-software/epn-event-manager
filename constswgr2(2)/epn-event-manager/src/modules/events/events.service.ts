@@ -9,6 +9,9 @@ import { QueryEventEntity } from '../../database/entities/query-event.entity';
 import { EventFiltersDto } from './dto/event-filters.dto';
 import { LatestEventsQueryDto } from './dto/latest-events-query.dto';
 
+const LOCAL_DATE_PATTERN = /^(\d{1,2})[/-](\d{1,2})[/-](\d{4}),?\s+(.+)$/;
+const LOCAL_TIME_PATTERN = /^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(.*)$/;
+
 @Injectable()
 export class EventsService {
   private readonly logger = new Logger(EventsService.name);
@@ -301,6 +304,47 @@ export class EventsService {
     }
 
     const parsedDate = new Date(rawDate).getTime();
-    return Number.isNaN(parsedDate) ? 0 : parsedDate;
+    if (!Number.isNaN(parsedDate)) {
+      return parsedDate;
+    }
+
+    return this.parseLocalEventTimestamp(rawDate);
+  }
+
+  private parseLocalEventTimestamp(rawDate: string): number {
+    const dateParts = LOCAL_DATE_PATTERN.exec(rawDate.trim());
+    if (!dateParts) {
+      return 0;
+    }
+
+    const timeParts = LOCAL_TIME_PATTERN.exec(dateParts[4]);
+    if (!timeParts) {
+      return 0;
+    }
+
+    const day = Number(dateParts[1]);
+    const month = Number(dateParts[2]);
+    const year = Number(dateParts[3]);
+    let hour = Number(timeParts[1]);
+    const minute = Number(timeParts[2]);
+    const second = Number(timeParts[3] ?? 0);
+    const period = timeParts[4].toLowerCase().replace(/[\s.]/g, '');
+
+    if (period !== '' && period !== 'am' && period !== 'pm') {
+      return 0;
+    }
+    if (period === 'pm' && hour < 12) hour += 12;
+    if (period === 'am' && hour === 12) hour = 0;
+
+    const normalizedDate = new Date(year, month - 1, day, hour, minute, second);
+    if (
+      normalizedDate.getFullYear() !== year ||
+      normalizedDate.getMonth() !== month - 1 ||
+      normalizedDate.getDate() !== day
+    ) {
+      return 0;
+    }
+
+    return normalizedDate.getTime();
   }
 }

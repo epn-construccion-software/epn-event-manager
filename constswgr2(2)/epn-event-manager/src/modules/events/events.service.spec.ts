@@ -424,6 +424,89 @@ describe('EventsService', () => {
       );
     });
 
+    it('orders localized day/month dates before applying the limit', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 14:43:00',
+        } as CreateEventEntity,
+        {
+          id: 6,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 11:45:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 7,
+          source: 'cleaning-crud',
+          timestamp: '26/07/2026, 14:42:00',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest(2);
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 5 }),
+        expect.objectContaining({ id: 7 }),
+      ]);
+    });
+
+    it('normalizes supported local date variants safely', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          recorded_at: '26/07/2026, 2:43:05 p. m.',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 6,
+          timestamp: '26-07-2026 12:05 a. m.',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([
+        {
+          id: 7,
+          createdAt: '2026-07-26T14:42:00.000Z',
+        } as DeleteEventEntity,
+      ]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 5 }),
+        expect.objectContaining({ id: 7 }),
+        expect.objectContaining({ id: 6 }),
+      ]);
+    });
+
+    it('places unsupported date variants at the end', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          recorded_at: '2026-07-26T14:43:00.000Z',
+        } as CreateEventEntity,
+        {} as CreateEventEntity,
+        { recorded_at: 123 } as unknown as CreateEventEntity,
+        { recorded_at: 'fecha desconocida' } as CreateEventEntity,
+        { recorded_at: '26/07/2026 sin-hora' } as CreateEventEntity,
+        { recorded_at: '26/07/2026 14:43 xyz' } as CreateEventEntity,
+        { recorded_at: '31/02/2026 14:43' } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest();
+
+      expect(result[0]).toEqual(expect.objectContaining({ id: 5 }));
+    });
+
     it.each([
       ['0', '0'],
       ['-1', '-1'],
