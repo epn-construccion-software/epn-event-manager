@@ -50,8 +50,10 @@ epn-event-manager/
 ├── docs/
 │   ├── definition-of-done.md
 │   ├── definition-of-ready.md
+│   ├── demo-funcional-v1.2.0.md
 │   ├── kanban-workflow.md
-│   └── monorepo-architecture.md
+│   ├── monorepo-architecture.md
+│   └── testing-strategy.md
 ├── CHANGELOG.md
 ├── README.md
 └── sonar-project.properties
@@ -184,11 +186,20 @@ El flujo habitual consiste en crear una rama de trabajo desde `develop`, realiza
 - [Definition of Done](docs/definition-of-done.md)
 - [Flujo Kanban](docs/kanban-workflow.md)
 - [Arquitectura del monorepo](docs/monorepo-architecture.md)
+- [Estrategia de pruebas](docs/testing-strategy.md)
+- [Demo funcional v1.2.0](docs/demo-funcional-v1.2.0.md)
 - [Changelog](CHANGELOG.md)
 
 ## Release actual
 
-La versión estable documentada actualmente es **v1.0.0**. Los cambios incluidos en esta versión se detallan en el [Changelog](CHANGELOG.md).
+La versión estable documentada actualmente es **v1.2.0**. Este release
+consolida las mejoras funcionales, correcciones, refactorizaciones y
+fortalecimiento de pruebas desarrollados desde la línea base `v1.0.0`.
+
+- Consulta el resumen formal y los issues incluidos en el
+  [Changelog](CHANGELOG.md).
+- Sigue la ejecución paso a paso en la
+  [guía de demo funcional v1.2.0](docs/demo-funcional-v1.2.0.md).
 
 ## Actividades relacionadas con el README
 
