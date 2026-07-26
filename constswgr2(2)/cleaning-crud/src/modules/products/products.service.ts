@@ -9,6 +9,7 @@ import { Repository } from 'typeorm';
 import { Product } from './product.model';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { SearchProductsDto } from './dto/search-products.dto';
 import { EventEmitterService } from '../../services/event-emitter.service';
 import { LoggerService } from '../../services/logger.service';
 import { ProductEntity } from './product.entity';
@@ -87,12 +88,15 @@ export class ProductsService {
     }
   }
 
-  async findAll(): Promise<Product[]> {
+  async findAll(filters: SearchProductsDto = {}): Promise<Product[]> {
     try {
       const products = await this.productsRepository.find();
       // [PREVENTIVE] filter out logically deleted items when enabled
-      const filtered = this.filterDeletedProducts(products);
-      const models = filtered.map(product => this.entityToModel(product));
+      const activeProducts = this.filterDeletedProducts(products);
+      const filteredProducts = this.filterProducts(activeProducts, filters);
+      const models = filteredProducts.map(product =>
+        this.entityToModel(product),
+      );
 
       this.logger.info('Productos listados', {
         route: '/products',
@@ -123,13 +127,10 @@ export class ProductsService {
 
   async findOne(id: number): Promise<Product> {
     try {
-      const product = await this.productsRepository.findOne({ where: { id } });
-
-      if (!product || (this.isLogicalDeleteEnabled() && product.deleted)) {
-        throw new NotFoundException(
-          `Producto con ID ${id} no encontrado en la base de datos`,
-        );
-      }
+      const product = await this.getExistingProduct(
+        id,
+        `Producto con ID ${id} no encontrado en la base de datos`,
+      );
 
       const model = this.entityToModel(product);
       this.logger.info('Producto consultado', {
@@ -165,13 +166,10 @@ export class ProductsService {
     updateProductDto: UpdateProductDto,
   ): Promise<Product> {
     try {
-      const product = await this.productsRepository.findOne({ where: { id } });
-
-      if (!product) {
-        throw new NotFoundException(
-          `Producto con ID ${id} no encontrado. No se puede actualizar.`,
-        );
-      }
+      const product = await this.getExistingProduct(
+        id,
+        `Producto con ID ${id} no encontrado. No se puede actualizar.`,
+      );
 
       // [PREVENTIVE] Validate all fields consistently in update (same rules as create)
       this.productValidation.validateUpdate(updateProductDto);
@@ -217,13 +215,10 @@ export class ProductsService {
 
   async remove(id: number): Promise<Product> {
     try {
-      const product = await this.productsRepository.findOne({ where: { id } });
-
-      if (!product) {
-        throw new NotFoundException(
-          `Producto con ID ${id} no encontrado. No se puede eliminar.`,
-        );
-      }
+      const product = await this.getExistingProduct(
+        id,
+        `Producto con ID ${id} no encontrado. No se puede eliminar.`,
+      );
 
       const model = this.entityToModel(product);
       if (this.isLogicalDeleteEnabled()) {
@@ -285,6 +280,21 @@ export class ProductsService {
         'Error interno generando estadísticas',
       );
     }
+  }
+
+  // Regla única de existencia: usada por findOne, update y remove para que
+  // un producto inexistente o lógicamente eliminado produzca siempre 404.
+  private async getExistingProduct(
+    id: number,
+    notFoundMessage: string,
+  ): Promise<ProductEntity> {
+    const product = await this.productsRepository.findOne({ where: { id } });
+
+    if (!product || (this.isLogicalDeleteEnabled() && product.deleted)) {
+      throw new NotFoundException(notFoundMessage);
+    }
+
+    return product;
   }
 
   async getActiveSummary(): Promise<ActiveProductsSummary> {
@@ -424,6 +434,31 @@ export class ProductsService {
       category: product.category,
       metadata: this.getAdaptiveMetadata(),
     };
+  }
+
+  private filterProducts(
+    products: ProductEntity[],
+    filters: SearchProductsDto,
+  ): ProductEntity[] {
+    const normalizedName = this.normalizeSearchValue(filters.name);
+    const normalizedCategory = this.normalizeSearchValue(filters.category);
+
+    return products.filter(product => {
+      const productName = this.normalizeSearchValue(product.name);
+      const productCategory = this.normalizeSearchValue(product.category);
+
+      const matchesName =
+        normalizedName.length === 0 || productName.includes(normalizedName);
+      const matchesCategory =
+        normalizedCategory.length === 0 ||
+        productCategory === normalizedCategory;
+
+      return matchesName && matchesCategory;
+    });
+  }
+
+  private normalizeSearchValue(value?: string): string {
+    return value?.trim().toLowerCase() ?? '';
   }
 
   private filterDeletedProducts(products: ProductEntity[]): ProductEntity[] {

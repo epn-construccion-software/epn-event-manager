@@ -114,6 +114,18 @@ describe('ProductsController', () => {
     await expect(controller.findAll()).rejects.toThrow(HttpException);
   });
 
+  it('forwards name and category filters when listing products', async () => {
+    const filters = {
+      name: 'cloro',
+      category: 'desinfectantes',
+    };
+    productsService.findAll.mockResolvedValueOnce([makeProduct()]);
+
+    await expect(controller.findAll(filters)).resolves.toHaveLength(1);
+
+    expect(productsService.findAll).toHaveBeenCalledWith(filters);
+  });
+
   it('returns stats and converts stats errors to 500', async () => {
     productsService.getStats.mockResolvedValueOnce({
       totalProducts: 1,

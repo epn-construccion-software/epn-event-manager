@@ -164,6 +164,120 @@ describe('Products API (e2e)', () => {
       .expect(200);
   });
 
+  // ── Búsqueda por nombre y categoría ──────────────────────────────────────
+
+  describe('GET /products con filtros', () => {
+    let matchingId: number;
+    let sameNameId: number;
+    let sameCategoryId: number;
+
+    beforeAll(async () => {
+      const matchingResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Cloro',
+          category: 'CategoriaJosue',
+          quantity: 3,
+          price: 2,
+        })
+        .expect(201);
+      matchingId = (matchingResponse.body as { id: number }).id;
+
+      const sameNameResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'FiltroJosue Gel',
+          category: 'OtraCategoria',
+          quantity: 4,
+          price: 3,
+        })
+        .expect(201);
+      sameNameId = (sameNameResponse.body as { id: number }).id;
+
+      const sameCategoryResponse = await request(app.getHttpServer())
+        .post('/products')
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .send({
+          name: 'Producto Distinto',
+          category: 'CategoriaJosue',
+          quantity: 5,
+          price: 4,
+        })
+        .expect(201);
+      sameCategoryId = (sameCategoryResponse.body as { id: number }).id;
+    });
+
+    afterAll(async () => {
+      for (const id of [sameNameId, sameCategoryId]) {
+        if (id) {
+          await request(app.getHttpServer())
+            .delete(`/products/${id}`)
+            .set('X-FIS-EPN-KEY', API_KEY);
+        }
+      }
+    });
+
+    it('busca parcialmente por nombre ignorando mayúsculas y espacios', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: '  FILTROJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameNameId]));
+      expect(ids).not.toContain(sameCategoryId);
+    });
+
+    it('busca por categoría normalizada usando coincidencia exacta', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ category: '  CATEGORIAJOSUE  ' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const ids = (response.body as Array<{ id: number }>).map(
+        product => product.id,
+      );
+      expect(ids).toEqual(expect.arrayContaining([matchingId, sameCategoryId]));
+      expect(ids).not.toContain(sameNameId);
+    });
+
+    it('combina los filtros name y category usando AND', async () => {
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({
+          name: 'filtrojosue',
+          category: 'categoriajosue',
+        })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([
+        expect.objectContaining({ id: matchingId }),
+      ]);
+    });
+
+    it('excluye de la búsqueda los productos eliminados', async () => {
+      await request(app.getHttpServer())
+        .delete(`/products/${matchingId}`)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      const response = await request(app.getHttpServer())
+        .get('/products')
+        .query({ name: 'FiltroJosue Cloro' })
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(200);
+
+      expect(response.body).toEqual([]);
+    });
+  });
+
   // ── Errores 404 ───────────────────────────────────────────────────────────
 
   it('GET /products/:id después de eliminar debe responder 404', () => {
@@ -195,6 +309,79 @@ describe('Products API (e2e)', () => {
       .expect(404);
   });
 
+  it.each([
+    ['GET', '/products/999999'],
+    ['PATCH', '/products/999999'],
+    ['DELETE', '/products/999999'],
+  ])(
+    '%s /products/999999 responde 404 con los cinco campos acordados',
+    async (method, url) => {
+      const httpMethod = method.toLowerCase() as 'get' | 'patch' | 'delete';
+      const agent = request(app.getHttpServer());
+      const response = await agent[httpMethod](url)
+        .set('X-FIS-EPN-KEY', API_KEY)
+        .expect(404);
+
+      expect(response.body).toEqual(
+        expect.objectContaining({
+          statusCode: 404,
+          error: expect.any(String),
+          message: expect.stringContaining('999999'),
+          timestamp: expect.any(String),
+          path: '/products/999999',
+        }),
+      );
+    },
+  );
+
+  it('PATCH y DELETE sobre un producto ya eliminado responden 404 sin modificarlo', async () => {
+    const createResponse = await request(app.getHttpServer())
+      .post('/products')
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({
+        name: 'Producto Fantasma',
+        category: 'Pruebas',
+        quantity: 1,
+        price: 1,
+      })
+      .expect(201);
+    const ghostId = (createResponse.body as { id: number }).id;
+
+    await request(app.getHttpServer())
+      .delete(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(200);
+
+    const patchAfterDelete = await request(app.getHttpServer())
+      .patch(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .send({ price: 999 })
+      .expect(404);
+    expect(patchAfterDelete.body).toEqual(
+      expect.objectContaining({
+        statusCode: 404,
+        error: expect.any(String),
+        message: expect.any(String),
+        timestamp: expect.any(String),
+        path: `/products/${ghostId}`,
+      }),
+    );
+
+    const deleteAgain = await request(app.getHttpServer())
+      .delete(`/products/${ghostId}`)
+      .set('X-FIS-EPN-KEY', API_KEY)
+      .expect(404);
+    expect(deleteAgain.body).toEqual(
+      expect.objectContaining({
+        statusCode: 404,
+        error: expect.any(String),
+        message: expect.any(String),
+        timestamp: expect.any(String),
+        path: `/products/${ghostId}`,
+      }),
+    );
+  });
+
   // ── Errores 400 ───────────────────────────────────────────────────────────
 
   it('GET /products/abc debe responder 400 por ID no numérico', () => {
@@ -203,6 +390,19 @@ describe('Products API (e2e)', () => {
       .set('X-FIS-EPN-KEY', API_KEY)
       .expect(400);
   });
+
+  it.each([
+    ['GET', '/products/abc'],
+    ['PATCH', '/products/abc'],
+    ['DELETE', '/products/abc'],
+  ])(
+    '%s /products/abc responde 400 por ID con formato inválido',
+    (method, url) => {
+      const httpMethod = method.toLowerCase() as 'get' | 'patch' | 'delete';
+      const agent = request(app.getHttpServer());
+      return agent[httpMethod](url).set('X-FIS-EPN-KEY', API_KEY).expect(400);
+    },
+  );
 
   it('POST /products sin campos requeridos debe responder 400', () => {
     return request(app.getHttpServer())
