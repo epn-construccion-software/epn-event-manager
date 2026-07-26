@@ -78,4 +78,43 @@ describe('StatsService', () => {
       total: 0,
     });
   });
+
+  it('normaliza a cero cuando los repositorios devuelven null o undefined', async () => {
+    createEventsRepository.count.mockResolvedValue(null as unknown as number);
+    updateEventsRepository.count.mockResolvedValue(
+      undefined as unknown as number,
+    );
+    deleteEventsRepository.count.mockResolvedValue(0);
+    queryEventsRepository.count.mockResolvedValue(2);
+
+    const result = await service.getStats();
+
+    expect(result).toEqual({
+      create: 0,
+      update: 0,
+      delete: 0,
+      query: 2,
+      total: 2,
+    });
+
+    Object.values(result as Record<string, number>).forEach((value) => {
+      expect(typeof value).toBe('number');
+      expect(Number.isNaN(value)).toBe(false);
+    });
+  });
+
+  it('normaliza a cero los conteos no numéricos en vez de propagar NaN', async () => {
+    createEventsRepository.count.mockResolvedValue('abc' as unknown as number);
+    updateEventsRepository.count.mockResolvedValue(5);
+    deleteEventsRepository.count.mockResolvedValue(Number.NaN);
+    queryEventsRepository.count.mockResolvedValue(1);
+
+    await expect(service.getStats()).resolves.toEqual({
+      create: 0,
+      update: 5,
+      delete: 0,
+      query: 1,
+      total: 6,
+    });
+  });
 });
