@@ -301,6 +301,41 @@ export class EventsService {
     }
 
     const parsedDate = new Date(rawDate).getTime();
-    return Number.isNaN(parsedDate) ? 0 : parsedDate;
+    if (!Number.isNaN(parsedDate)) {
+      return parsedDate;
+    }
+
+    const localDateMatch = rawDate
+      .trim()
+      .match(
+        /^(\d{1,2})[/-](\d{1,2})[/-](\d{4}),?\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(a\.?\s*m\.?|p\.?\s*m\.?)?$/i,
+      );
+    if (!localDateMatch) {
+      return 0;
+    }
+
+    const day = Number(localDateMatch[1]);
+    const month = Number(localDateMatch[2]);
+    const year = Number(localDateMatch[3]);
+    let hour = Number(localDateMatch[4]);
+    const minute = Number(localDateMatch[5]);
+    const second = Number(localDateMatch[6] ?? 0);
+    const period = (localDateMatch[7] ?? '')
+      .toLowerCase()
+      .replace(/[\s.]/g, '');
+
+    if (period === 'pm' && hour < 12) hour += 12;
+    if (period === 'am' && hour === 12) hour = 0;
+
+    const normalizedDate = new Date(year, month - 1, day, hour, minute, second);
+    if (
+      normalizedDate.getFullYear() !== year ||
+      normalizedDate.getMonth() !== month - 1 ||
+      normalizedDate.getDate() !== day
+    ) {
+      return 0;
+    }
+
+    return normalizedDate.getTime();
   }
 }

@@ -424,6 +424,37 @@ describe('EventsService', () => {
       );
     });
 
+    it('orders localized day/month dates before applying the limit', async () => {
+      createRepo.find.mockResolvedValue([
+        {
+          id: 5,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 14:43:00',
+        } as CreateEventEntity,
+        {
+          id: 6,
+          source: 'cleaning-crud',
+          recorded_at: '26/07/2026, 11:45:00',
+        } as CreateEventEntity,
+      ]);
+      updateRepo.find.mockResolvedValue([
+        {
+          id: 7,
+          source: 'cleaning-crud',
+          timestamp: '26/07/2026, 14:42:00',
+        } as UpdateEventEntity,
+      ]);
+      deleteRepo.find.mockResolvedValue([]);
+      queryRepo.find.mockResolvedValue([]);
+
+      const result = await service.findLatest(2);
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 5 }),
+        expect.objectContaining({ id: 7 }),
+      ]);
+    });
+
     it.each([
       ['0', '0'],
       ['-1', '-1'],
