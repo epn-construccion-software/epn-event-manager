@@ -1,18 +1,19 @@
+import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { getRepositoryToken } from '@nestjs/typeorm';
 import supertest from 'supertest';
 import { AppModule } from './../src/app.module';
-import { getRepositoryToken } from '@nestjs/typeorm';
 import { CreateEventEntity } from '../src/database/entities/create-event.entity';
-import { UpdateEventEntity } from '../src/database/entities/update-event.entity';
 import { DeleteEventEntity } from '../src/database/entities/delete-event.entity';
 import { QueryEventEntity } from '../src/database/entities/query-event.entity';
+import { UpdateEventEntity } from '../src/database/entities/update-event.entity';
 
 describe('AppController (e2e)', () => {
   let app: INestApplication;
 
   const repositoryMock = (events: object[]) => ({
     find: jest.fn().mockResolvedValue(events),
+
     findBy: jest
       .fn()
       .mockImplementation((filters: Record<string, string>) =>
@@ -25,9 +26,12 @@ describe('AppController (e2e)', () => {
           ),
         ),
       ),
+
     count: jest.fn().mockResolvedValue(events.length),
-    create: jest.fn(),
-    save: jest.fn(),
+
+    create: jest.fn((data: object) => data),
+
+    save: jest.fn().mockResolvedValue({}),
   });
 
   const createEvents = [
@@ -39,6 +43,7 @@ describe('AppController (e2e)', () => {
       recorded_at: '2026-07-07 10:00:00',
     },
   ];
+
   const updateEvents = [
     {
       id: 2,
@@ -48,6 +53,7 @@ describe('AppController (e2e)', () => {
       timestamp: '2026-07-07 11:00:00',
     },
   ];
+
   const deleteEvents = [
     {
       id: 3,
@@ -57,6 +63,7 @@ describe('AppController (e2e)', () => {
       createdAt: '2026-07-07 12:00:00',
     },
   ];
+
   const queryEvents = [
     {
       id: 4,
@@ -75,12 +82,15 @@ describe('AppController (e2e)', () => {
     moduleBuilder
       .overrideProvider(getRepositoryToken(CreateEventEntity))
       .useValue(repositoryMock(createEvents));
+
     moduleBuilder
       .overrideProvider(getRepositoryToken(UpdateEventEntity))
       .useValue(repositoryMock(updateEvents));
+
     moduleBuilder
       .overrideProvider(getRepositoryToken(DeleteEventEntity))
       .useValue(repositoryMock(deleteEvents));
+
     moduleBuilder
       .overrideProvider(getRepositoryToken(QueryEventEntity))
       .useValue(repositoryMock(queryEvents));
@@ -88,6 +98,13 @@ describe('AppController (e2e)', () => {
     const moduleFixture: TestingModule = await moduleBuilder.compile();
 
     app = moduleFixture.createNestApplication();
+
+    app.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+      }),
+    );
+
     await app.init();
   });
 
@@ -115,7 +132,9 @@ describe('AppController (e2e)', () => {
       .get(url)
       .expect(200);
 
-    expect(response.body).toHaveLength(expectedCount);
+    const body = response.body as unknown[];
+
+    expect(body).toHaveLength(expectedCount);
   });
 
   it.each([
@@ -130,91 +149,193 @@ describe('AppController (e2e)', () => {
       .get(url)
       .expect(400);
 
-    const body = response.body as { message: unknown };
+    const body = response.body as {
+      message: unknown;
+    };
+
     expect(body.message).toEqual(expect.stringMatching(/filtro/i));
   });
 
-  it('/stats (GET) returns numeric counts when repositories have data', async () => {
+  it('/events/latest (GET) returns events ordered from most to least recent', async () => {
     const response = await supertest(
       app.getHttpServer() as Parameters<typeof supertest>[0],
     )
-      .get('/stats')
+      .get('/events/latest')
       .expect(200);
 
+    const body = response.body as Array<{
+      id: number;
+    }>;
+
+    expect(body.map((event) => event.id)).toEqual([4, 3, 2, 1]);
+  });
+
+  it('/events/latest?limit=N (GET) caps the amount of returned events', async () => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get('/events/latest?limit=2')
+      .expect(200);
+
+    const body = response.body as Array<{
+      id: number;
+    }>;
+
+    expect(body).toHaveLength(2);
+    expect(body.map((event) => event.id)).toEqual([4, 3]);
+  });
+
+  it.each([
+    '/events/latest?limit=0',
+    '/events/latest?limit=abc',
+    '/events/latest?limit=101',
+  ])('%s (GET) rejects an invalid limit', async (url) => {
+    const response = await supertest(
+      app.getHttpServer() as Parameters<typeof supertest>[0],
+    )
+      .get(url)
+      .expect(400);
+
     const body = response.body as {
-      create: number;
-      update: number;
-      delete: number;
-      query: number;
-      total: number;
+      message: unknown;
     };
-    expect(body).toEqual({
-      create: 1,
-      update: 1,
-      delete: 1,
-      query: 1,
-      total: 4,
-    });
-  });
-});
 
-describe('StatsController (e2e) - empty repositories', () => {
-  let app: INestApplication;
-
-  const emptyRepositoryMock = () => ({
-    find: jest.fn().mockResolvedValue([]),
-    findBy: jest.fn().mockResolvedValue([]),
-    count: jest.fn().mockResolvedValue(0),
-    create: jest.fn(),
-    save: jest.fn(),
+    expect(body.message).toEqual(expect.stringMatching(/limit/i));
   });
 
-  beforeAll(async () => {
-    const moduleBuilder = Test.createTestingModule({
+  it('/events/latest (GET) returns 200 and [] when there are no events', async () => {
+    const emptyModuleBuilder = Test.createTestingModule({
       imports: [AppModule],
     });
 
-    moduleBuilder
+    emptyModuleBuilder
       .overrideProvider(getRepositoryToken(CreateEventEntity))
-      .useValue(emptyRepositoryMock());
-    moduleBuilder
+      .useValue(repositoryMock([]));
+
+    emptyModuleBuilder
       .overrideProvider(getRepositoryToken(UpdateEventEntity))
-      .useValue(emptyRepositoryMock());
-    moduleBuilder
+      .useValue(repositoryMock([]));
+
+    emptyModuleBuilder
       .overrideProvider(getRepositoryToken(DeleteEventEntity))
-      .useValue(emptyRepositoryMock());
-    moduleBuilder
+      .useValue(repositoryMock([]));
+
+    emptyModuleBuilder
       .overrideProvider(getRepositoryToken(QueryEventEntity))
-      .useValue(emptyRepositoryMock());
+      .useValue(repositoryMock([]));
 
-    const moduleFixture: TestingModule = await moduleBuilder.compile();
+    const emptyModuleFixture = await emptyModuleBuilder.compile();
+    const emptyApp = emptyModuleFixture.createNestApplication();
 
-    app = moduleFixture.createNestApplication();
-    await app.init();
-  });
+    emptyApp.useGlobalPipes(
+      new ValidationPipe({
+        transform: true,
+      }),
+    );
 
-  afterAll(async () => {
-    await app.close();
-  });
+    await emptyApp.init();
 
-  it('/stats (GET) returns five zero values, all numeric, when every repository is empty', async () => {
     const response = await supertest(
-      app.getHttpServer() as Parameters<typeof supertest>[0],
+      emptyApp.getHttpServer() as Parameters<typeof supertest>[0],
     )
-      .get('/stats')
+      .get('/events/latest')
       .expect(200);
 
-    const body = response.body as Record<string, number>;
-    expect(body).toEqual({
-      create: 0,
-      update: 0,
-      delete: 0,
-      query: 0,
-      total: 0,
+    const body = response.body as unknown[];
+
+    expect(body).toEqual([]);
+
+    await emptyApp.close();
+  });
+
+  describe('POST /events validation', () => {
+    const validEvent = {
+      source: 'cleaning-crud',
+      entity: 'product',
+      action: 'CREATE',
+      title: 'Product created',
+      description: 'A product was created',
+      payload: {
+        id: 1,
+        name: 'Cloro',
+      },
+    };
+
+    const invalidPayloadCases: Array<[string, unknown]> = [
+      ['string', 'invalid payload'],
+      ['array', [{ id: 1 }]],
+      ['number', 25],
+      ['null', null],
+    ];
+
+    it.each([
+      ['source', { ...validEvent, source: undefined }],
+      ['entity', { ...validEvent, entity: undefined }],
+      ['action', { ...validEvent, action: undefined }],
+      ['title', { ...validEvent, title: undefined }],
+    ])('rejects a request when %s is missing', async (_field, payload) => {
+      const response = await supertest(
+        app.getHttpServer() as Parameters<typeof supertest>[0],
+      )
+        .post('/events')
+        .send(payload)
+        .expect(400);
+
+      const body = response.body as {
+        statusCode: number;
+        message: unknown;
+      };
+
+      expect(body.statusCode).toBe(400);
+      expect(body.message).toBeDefined();
     });
-    Object.values(body).forEach((value) => {
-      expect(typeof value).toBe('number');
-      expect(Number.isNaN(value)).toBe(false);
+
+    it.each([
+      ['source', { ...validEvent, source: '   ' }],
+      ['entity', { ...validEvent, entity: '' }],
+      ['action', { ...validEvent, action: '   ' }],
+      ['title', { ...validEvent, title: '' }],
+    ])('rejects a request when %s is empty', async (_field, payload) => {
+      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
+        .post('/events')
+        .send(payload)
+        .expect(400);
     });
+
+    it('rejects an unsupported action', async () => {
+      await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
+        .post('/events')
+        .send({
+          ...validEvent,
+          action: 'ARCHIVE',
+        })
+        .expect(400);
+    });
+
+    it.each(invalidPayloadCases)(
+      'rejects payload when it is a %s',
+      async (_type: string, invalidPayload: unknown) => {
+        await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
+          .post('/events')
+          .send({
+            ...validEvent,
+            payload: invalidPayload,
+          })
+          .expect(400);
+      },
+    );
+
+    it.each(['CREATE', 'UPDATE', 'DELETE', 'QUERY'])(
+      'accepts the valid action %s',
+      async (action) => {
+        await supertest(app.getHttpServer() as Parameters<typeof supertest>[0])
+          .post('/events')
+          .send({
+            ...validEvent,
+            action,
+          })
+          .expect(201);
+      },
+    );
   });
 });

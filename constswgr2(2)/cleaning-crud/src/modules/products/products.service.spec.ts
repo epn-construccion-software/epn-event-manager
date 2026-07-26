@@ -208,6 +208,83 @@ describe('ProductsService', () => {
     );
   });
 
+  it('filters products by partial name ignoring case and spaces', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro Concentrado',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Jabón Líquido',
+        category: 'Higiene',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'CLORO Gel',
+        category: 'Desinfectantes',
+      }),
+    ]);
+
+    const products = await service.findAll({ name: '  cloro  ' });
+
+    expect(products.map(product => product.id)).toEqual([1, 3]);
+  });
+
+  it('filters products by normalized category using exact matching', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Alcohol',
+        category: 'desinfectantes',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'Limpiador',
+        category: 'Desinfectantes industriales',
+      }),
+    ]);
+
+    const products = await service.findAll({
+      category: '  DESINFECTANTES  ',
+    });
+
+    expect(products.map(product => product.id)).toEqual([1, 2]);
+  });
+
+  it('combines name and category filters using AND', async () => {
+    repo.find.mockResolvedValue([
+      makeProductEntity({
+        id: 1,
+        name: 'Cloro Gel',
+        category: 'Desinfectantes',
+      }),
+      makeProductEntity({
+        id: 2,
+        name: 'Cloro Perfumado',
+        category: 'Aromatizantes',
+      }),
+      makeProductEntity({
+        id: 3,
+        name: 'Jabón',
+        category: 'Desinfectantes',
+      }),
+    ]);
+
+    const products = await service.findAll({
+      name: 'cloro',
+      category: 'desinfectantes',
+    });
+
+    expect(products.map(product => product.id)).toEqual([1]);
+  });
+
   it('wraps repository errors while listing', async () => {
     repo.find.mockRejectedValue(new Error('find failed'));
 
@@ -305,6 +382,16 @@ describe('ProductsService', () => {
     );
   });
 
+  it('throws NotFoundException when updating a logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 6, deleted: true }));
+
+    await expect(service.update(6, { price: 10 })).rejects.toThrow(
+      NotFoundException,
+    );
+    expect(repo.save).not.toHaveBeenCalled();
+  });
+
   it('wraps unexpected update errors', async () => {
     repo.findOne.mockResolvedValue(makeProductEntity());
     repo.save.mockRejectedValue(new Error('save failed'));
@@ -339,6 +426,15 @@ describe('ProductsService', () => {
 
   it('throws NotFoundException when removing a missing product', async () => {
     await expect(service.remove(404)).rejects.toThrow(NotFoundException);
+  });
+
+  it('throws NotFoundException when removing an already logically deleted product', async () => {
+    process.env.LOGICAL_DELETE = 'true';
+    repo.findOne.mockResolvedValue(makeProductEntity({ id: 7, deleted: true }));
+
+    await expect(service.remove(7)).rejects.toThrow(NotFoundException);
+    expect(repo.save).not.toHaveBeenCalled();
+    expect(repo.remove).not.toHaveBeenCalled();
   });
 
   it('wraps unexpected remove errors', async () => {
